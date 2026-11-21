@@ -124,8 +124,29 @@ public class SysInterceptor implements HandlerInterceptor {
 		request.setAttribute("xzqdm", result.get("xzqdm"));// 用户所属行政区代码，预留
 		request.setAttribute("token", result.get("token"));// token信息
 		request.setAttribute(Constants.ADMIN_FLAG, result.get(Constants.ADMIN_FLAG));// 管理员标识
+		/*
+		 * 业务 API v1 鉴权说明：
+		 * - 完整对外路径（含 context-path）为 /zuul/api/v1/**
+		 * - 本拦截器仅做登录 Token 校验，不按 T_JC_ACTION 精细鉴权；
+		 *   因此已登录用户访问 /api/v1/disaster-events/**、/api/v1/survey/**、
+		 *   /api/v1/assessment/** 不会因未录入旧权限表而 403。
+		 * - 未登录仍返回 401（上方 INVALID 分支）。
+		 */
+		if (isApiV1Path(requestURI)) {
+			logger.debug("API v1 业务接口已通过 Token 校验放行: {}", requestURI);
+		}
         return true;
     }
+
+	/** 是否为重构后的 /api/v1 业务接口（兼容是否带 /zuul 前缀） */
+	private boolean isApiV1Path(String requestURI) {
+		if (requestURI == null) {
+			return false;
+		}
+		return requestURI.contains("/api/v1/disaster-events")
+				|| requestURI.contains("/api/v1/survey")
+				|| requestURI.contains("/api/v1/assessment");
+	}
   //根据对接要求，政务中台单点登录的接口认证业务具体如下
     //要求每次请求都要到认证中心检查当前用户的登录态，如果认证中心返回的登录为有效，则继续业务操作，
     //如果返回的为失效则需将当前应用用户session销毁完成登出操作。通过此种方式才能实现用户在一个系统退出，

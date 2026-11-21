@@ -10,8 +10,11 @@ import com.santech.module.biz.service.EvaluateTaskExeService;
 
 /**
  * 兼容旧接口：委托 {@link ExternalModelExecutor} 执行外部模型任务。
- * 新代码请直接注入 ExternalModelExecutor。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.engine.ExternalModelExecutor}；
+ *             HTTP 入口请改用 {@link com.santech.module.biz.assessment.controller.AssessmentController}。
  */
+@Deprecated
 @Service
 public class EvaluateTaskExeServiceImpl implements EvaluateTaskExeService {
 

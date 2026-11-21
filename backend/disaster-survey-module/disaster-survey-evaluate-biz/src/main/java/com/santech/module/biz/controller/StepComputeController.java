@@ -22,8 +22,13 @@ import io.swagger.annotations.ApiOperation;
 /**
  * 步骤 UI 服务端计算接口：识别 / 叠置 / 经济损失。
  * 对齐前端调查与评估面板，可落库 lite 任务。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.survey.controller.SurveyEventController}
+ *             与 {@link com.santech.module.biz.assessment.controller.AssessmentController}
+ *             （路径 {@code /api/v1/survey/**}、{@code /api/v1/assessment/**}）。
  */
-@Api(tags = "Evaluate-步骤计算接口")
+@Deprecated
+@Api(tags = "Evaluate-步骤计算接口(已废弃)")
 @RestController
 @RequestMapping("/web-disaster-evaluate/web/disaster/evaluate")
 public class StepComputeController {

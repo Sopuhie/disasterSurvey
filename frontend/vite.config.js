@@ -66,7 +66,34 @@ export default defineConfig(async () => ({
 		publicPath: '',
 		port,
 		hmr: true,
-		strictPort: true
+		strictPort: true,
+		/**
+		 * 本地联调代理：
+		 * - 后端 context-path=/zuul，端口见 application.yaml（默认 10401）
+		 * - 若 config.*.json 的 baseURL 指向绝对地址（含 /zuul/），Axios 直连后端，可不经本代理
+		 * - 若 baseURL 为相对路径 /zuul/ 或仅写 /api/v1，则由本代理转发，避免 404
+		 */
+		proxy: {
+			'/zuul': {
+				target: 'http://127.0.0.1:10401',
+				changeOrigin: true
+			},
+			'/api/v1': {
+				target: 'http://127.0.0.1:10401',
+				changeOrigin: true,
+				rewrite: path => `/zuul${path}`
+			},
+			'/web-disaster-evaluate': {
+				target: 'http://127.0.0.1:10401',
+				changeOrigin: true,
+				rewrite: path => `/zuul${path}`
+			},
+			'/web-disaster-authentication': {
+				target: 'http://127.0.0.1:10401',
+				changeOrigin: true,
+				rewrite: path => `/zuul${path}`
+			}
+		}
 	},
 	resolve: {
 		alias: {

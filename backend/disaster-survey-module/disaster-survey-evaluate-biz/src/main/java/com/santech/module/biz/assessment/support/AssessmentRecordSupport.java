@@ -54,10 +54,36 @@ public class AssessmentRecordSupport {
 	}
 
 	public BizSurveyBaselineModel requireConfirmedBaseline(String eventId) throws Exception {
-		BizSurveyBaselineModel baseline = findConfirmedBaseline(eventId);
-		if (baseline == null
-				|| !BaselineStatusEnum.CONFIRMED.getCode().equalsIgnoreCase(nvl(baseline.getStatus()))) {
-			throw new IllegalStateException("风暴潮评估需要已确认的调查基线，请先完成灾情调查并锁定基线");
+		BizSurveyBaselineModel confirmed = findConfirmedBaseline(eventId);
+		if (confirmed != null
+				&& BaselineStatusEnum.CONFIRMED.getCode().equalsIgnoreCase(nvl(confirmed.getStatus()))) {
+			return confirmed;
+		}
+		BizSurveyBaselineModel latest = findLatestBaseline(eventId);
+		if (latest == null) {
+			throw new IllegalStateException("未找到关联的灾情调查基线，请先完成灾情调查");
+		}
+		throw new IllegalStateException("当前调查基线尚未确认锁定，请先在灾情调查第4步确认基线后再执行评估");
+	}
+
+	/**
+	 * 海风/海浪：仅当入参显式传入 baselineId 时校验存在性与 CONFIRMED；未传则允许独立执行。
+	 */
+	public BizSurveyBaselineModel requireBaselineIfProvided(Map<String, Object> body) throws Exception {
+		if (body == null) {
+			return null;
+		}
+		Object raw = body.get("baselineId");
+		String baselineId = raw == null ? "" : String.valueOf(raw).trim();
+		if (StringUtil.isEmpty(baselineId) || "null".equalsIgnoreCase(baselineId)) {
+			return null;
+		}
+		BizSurveyBaselineModel baseline = surveyBaselineDao.getById(baselineId);
+		if (baseline == null) {
+			throw new IllegalStateException("未找到关联的灾情调查基线，请先完成灾情调查");
+		}
+		if (!BaselineStatusEnum.CONFIRMED.getCode().equalsIgnoreCase(nvl(baseline.getStatus()))) {
+			throw new IllegalStateException("当前调查基线尚未确认锁定，请先在灾情调查第4步确认基线后再执行评估");
 		}
 		return baseline;
 	}

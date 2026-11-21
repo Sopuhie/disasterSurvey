@@ -28,13 +28,15 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * @Title: DisasterSurveyTaskManagerController.java
- * @Description:评价灾情调查分析任务相关功能接口
- * @version V1.0
+ * 评价灾情调查分析任务相关功能接口（旧路径兼容）。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.survey.controller.SurveyEventController}
+ *             （路径 {@code /api/v1/survey/**}）。
  */
+@Deprecated
 @RestController
 @RequestMapping(value = "/web-disaster-evaluate/web/disaster/evaluate/survey/task")
-@Api(tags = "Evaluate-灾情调查分析任务管理相关功能接口")
+@Api(tags = "Evaluate-灾情调查分析任务管理相关功能接口(已废弃)")
 public class DisasterSurveyTaskManagerController {
 
     private static final  Logger logger = LoggerFactory.getLogger(DisasterSurveyTaskManagerController.class);

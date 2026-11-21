@@ -75,12 +75,14 @@
 	import ResultPanel from './components/ResultPanel.vue'
 	import { DArrowLeft } from '@element-plus/icons-vue'
 	import { computed } from 'vue'
+	import { useRoute } from 'vue-router'
 	import { SURVEY_STEPS } from './constants.js'
 	import { BaselineStatusLabel } from '@/constants/disasterEnums.js'
 	import { useAppStore } from '@/store/modules/app.js'
 	import { useSurveyStore } from '@/store/modules/survey.js'
 	import { useSurveyActions } from './composables/useSurveyActions.js'
 
+	const route = useRoute()
 	const appStore = useAppStore()
 	const surveyStore = useSurveyStore()
 	const { initSurvey, destroySurvey, ensureSurveyStepResult, workflowStore } = useSurveyActions()
@@ -133,10 +135,17 @@
 		await ensureSurveyStepResult(stepId)
 	}
 
-	onMounted(() => {
+	onMounted(async () => {
 		appStore.setCurNavObj('灾情调查')
 		surveyStore.setLeftPanelCollapsed(false)
-		initSurvey()
+		const stepFromQuery = String(route.query.step || '')
+		if (steps.some(item => item.id === stepFromQuery)) {
+			surveyStore.setStep(stepFromQuery)
+		}
+		await initSurvey()
+		if (steps.some(item => item.id === stepFromQuery)) {
+			await ensureSurveyStepResult(stepFromQuery)
+		}
 	})
 
 	onUnmounted(() => {

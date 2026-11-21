@@ -27,6 +27,14 @@ import com.santech.module.biz.service.BizFrontendDataService;
 
 import santech.common.dbcomponent.entity.dbcomponents.PageInfo;
 
+/**
+ * 万能表服务实现，仅保留运维台账与遗留读路径。
+ *
+ * @deprecated 请改用 event/survey/assessment 领域服务及 5 张核心表；
+ *             HTTP 入口请改用 {@link com.santech.module.biz.assessment.controller.AssessmentController}
+ *             与 survey 包下 Controller。
+ */
+@Deprecated
 @Service
 public class BizFrontendDataServiceImpl implements BizFrontendDataService {
 

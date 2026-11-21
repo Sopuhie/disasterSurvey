@@ -28,13 +28,15 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * @Title: EvaluateTaskManagerController.java
- * @Description:灾害评估运行任务相关功能接口
- * @version V1.0
+ * 灾害评估运行任务相关功能接口（旧路径兼容）。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.assessment.controller.AssessmentController}
+ *             （路径 {@code /api/v1/assessment/**}）。
  */
+@Deprecated
 @RestController
 @RequestMapping(value = "/web-disaster-evaluate/web/disaster/evaluate/task")
-@Api(tags = "Evaluate-灾害评估运行任务管理相关功能接口")
+@Api(tags = "Evaluate-灾害评估运行任务管理相关功能接口(已废弃)")
 public class EvaluateTaskManagerController {
 
     private static final  Logger logger = LoggerFactory.getLogger(EvaluateTaskManagerController.class);

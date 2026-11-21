@@ -40,8 +40,9 @@ public class SeaWaveAssessmentServiceImpl implements SeaWaveAssessmentService {
 	public ExecuteResult<Map<String, Object>> damage(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
 			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 			if ("ASYNC".equalsIgnoreCase(str(input.get("computeMode")))) {
 				BizAssessmentRecordModel running = recordSupport.upsertAsyncRunning(eventId, DisasterTypeEnum.SEA_WAVE,
 						AssessmentSubTypeEnum.WAVE_DAMAGE_ANALYSIS, event.getRegionCode(),
@@ -90,8 +91,9 @@ public class SeaWaveAssessmentServiceImpl implements SeaWaveAssessmentService {
 	public ExecuteResult<Map<String, Object>> behavior(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
 			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 
 			List<Map<String, Object>> points = asList(input.get("points"));
 			if (points.isEmpty()) {
@@ -135,7 +137,9 @@ public class SeaWaveAssessmentServiceImpl implements SeaWaveAssessmentService {
 	public ExecuteResult<Map<String, Object>> comprehensive(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
+			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 			BizAssessmentRecordModel damage = recordSupport.dao().getByEventAndSubType(eventId,
 					AssessmentSubTypeEnum.WAVE_DAMAGE_ANALYSIS.getCode());
 			BizAssessmentRecordModel behavior = recordSupport.dao().getByEventAndSubType(eventId,
@@ -174,7 +178,6 @@ public class SeaWaveAssessmentServiceImpl implements SeaWaveAssessmentService {
 			factors.put("severeCount", severe);
 			factors.put("erosionEstimateKm", erosion);
 
-			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
 			Map<String, Object> result = new HashMap<>();
 			result.put("kind", "wave-comprehensive");
 			result.put("eventId", eventId);

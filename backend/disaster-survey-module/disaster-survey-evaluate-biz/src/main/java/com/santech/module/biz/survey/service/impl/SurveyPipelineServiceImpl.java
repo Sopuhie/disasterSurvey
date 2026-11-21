@@ -534,15 +534,31 @@ public class SurveyPipelineServiceImpl implements SurveyPipelineService {
 	private BizSurveyBaselineModel requireEditableBaseline(String eventId, BizDisasterEventModel event,
 			String operator) throws Exception {
 		BizSurveyBaselineModel baseline = surveyBaselineDao.getLatestByEventId(eventId);
+		Date now = new Date();
 		if (baseline != null) {
 			String status = nvl(baseline.getStatus());
 			if (BaselineStatusEnum.CONFIRMED.getCode().equalsIgnoreCase(status)
 					|| BaselineStatusEnum.ARCHIVED.getCode().equalsIgnoreCase(status)) {
-				throw new IllegalStateException("调查基线已锁定(" + status + ")，不可修改；如需重算请新建事件或新建基线版本");
+				// 严禁覆盖已锁定基线：自动新建 DRAFT 且 version_no+1
+				int nextVer = baseline.getVersionNo() == null ? 2 : baseline.getVersionNo() + 1;
+				BizSurveyBaselineModel draft = new BizSurveyBaselineModel();
+				draft.setId("sb_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+				draft.setEventId(eventId);
+				draft.setVersionNo(nextVer);
+				draft.setStatus(BaselineStatusEnum.DRAFT.getCode());
+				draft.setDistrict(first(baseline.getDistrict(), event.getRegionName()));
+				draft.setSceneId(first(baseline.getSceneId(), eventId));
+				draft.setRsImageId(baseline.getRsImageId());
+				draft.setCjr(first(operator, "system"));
+				draft.setCjsj(now);
+				draft.setZhgxr(first(operator, "system"));
+				draft.setZhgxsj(now);
+				surveyBaselineDao.insert(draft);
+				logger.info("基线已锁定({}), 自动新建 DRAFT 版本 versionNo={}", status, nextVer);
+				return draft;
 			}
 			return baseline;
 		}
-		Date now = new Date();
 		baseline = new BizSurveyBaselineModel();
 		baseline.setId("sb_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
 		baseline.setEventId(eventId);

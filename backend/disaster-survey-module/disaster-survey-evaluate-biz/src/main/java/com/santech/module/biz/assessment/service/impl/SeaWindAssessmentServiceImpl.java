@@ -40,8 +40,9 @@ public class SeaWindAssessmentServiceImpl implements SeaWindAssessmentService {
 	public ExecuteResult<Map<String, Object>> damage(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
 			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 			if (isAsync(input)) {
 				BizAssessmentRecordModel running = recordSupport.upsertAsyncRunning(eventId, DisasterTypeEnum.SEA_WIND,
 						AssessmentSubTypeEnum.WIND_DAMAGE_ANALYSIS, event.getRegionCode(),
@@ -90,8 +91,9 @@ public class SeaWindAssessmentServiceImpl implements SeaWindAssessmentService {
 	public ExecuteResult<Map<String, Object>> behavior(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
 			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 
 			List<Map<String, Object>> points = asList(input.get("points"));
 			if (points.isEmpty()) {
@@ -139,7 +141,9 @@ public class SeaWindAssessmentServiceImpl implements SeaWindAssessmentService {
 	public ExecuteResult<Map<String, Object>> comprehensive(String eventId, Map<String, Object> body, String operator) {
 		try {
 			BizDisasterEventModel event = recordSupport.requireEvent(eventId);
-			BizSurveyBaselineModel baseline = recordSupport.findLatestBaseline(eventId);
+			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
+			BizSurveyBaselineModel linked = recordSupport.requireBaselineIfProvided(input);
+			BizSurveyBaselineModel baseline = linked != null ? linked : recordSupport.findLatestBaseline(eventId);
 			BizAssessmentRecordModel damage = recordSupport.dao().getByEventAndSubType(eventId,
 					AssessmentSubTypeEnum.WIND_DAMAGE_ANALYSIS.getCode());
 			BizAssessmentRecordModel behavior = recordSupport.dao().getByEventAndSubType(eventId,
@@ -176,7 +180,6 @@ public class SeaWindAssessmentServiceImpl implements SeaWindAssessmentService {
 			factors.put("severeCount", severe);
 			factors.put("behaviorScore", Math.min(100, maxWind * 2));
 
-			Map<String, Object> input = body == null ? new HashMap<>() : new HashMap<>(body);
 			Map<String, Object> result = new HashMap<>();
 			result.put("kind", "wind-comprehensive");
 			result.put("eventId", eventId);

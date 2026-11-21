@@ -26,8 +26,12 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * @deprecated 万能表接口已下线业务主路径。灾情调查请使用 {@code /api/v1/survey/**}，
- * 灾害评估请使用 {@code /api/v1/assessment/**}。本控制器仅保留运维台账过渡期 CRUD，后续版本移除。
+ * 万能表接口已下线业务主路径。本控制器仅保留运维台账过渡期 CRUD，后续版本移除。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.survey.controller.SurveyBaseController}、
+ *             {@link com.santech.module.biz.survey.controller.SurveyEventController}
+ *             与 {@link com.santech.module.biz.assessment.controller.AssessmentController}
+ *             （路径 {@code /api/v1/survey/**}、{@code /api/v1/assessment/**}）。
  */
 @Deprecated
 @Api(tags = "Evaluate-前端业务台账接口(已废弃)")

@@ -17,7 +17,11 @@ import com.santech.module.biz.engine.ExternalModelExecutor;
  * 异步评估任务状态轮询。
  * 仅处理 T_BIZ_ASSESSMENT_RECORD 中 compute_mode='ASYNC' AND status='RUNNING' 的记录。
  * 默认不启用调度注解；需要后台轮询时取消注释 @EnableScheduling / @Scheduled。
+ *
+ * @deprecated 请改用 {@link com.santech.module.biz.assessment.controller.AssessmentController}
+ *             同步评估主路径；异步轮询仅作兼容保留，后续版本移除。
  */
+@Deprecated
 @Component
 //@EnableScheduling
 public class ExecuteEvaluateScheduleTask {

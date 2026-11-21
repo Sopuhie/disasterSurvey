@@ -14,9 +14,9 @@
 					</span>
 				</div>
 				<div v-if="showBaselineGate" class="assess-baseline-gate">
-					<p>风暴潮经济损失 / 综合评估需要已确认的调查基线。</p>
+					<p>当前调查基线尚未确认锁定，请先在灾情调查第4步确认基线后再执行风暴潮评估。</p>
 					<div class="assess-baseline-gate__actions">
-						<el-button type="primary" size="small" @click="goSurvey">前往完成调查</el-button>
+						<el-button type="primary" size="small" @click="goSurveyCompare">前往灾情调查第4步</el-button>
 						<el-button size="small" @click="pickConfirmedEvent" :loading="pickingEvent">选择历史已确认事件</el-button>
 					</div>
 				</div>
@@ -103,6 +103,7 @@
 	import { ASSESS_TYPES, resolveTypeFromRoute } from './constants.js'
 	import { useAppStore } from '@/store/modules/app.js'
 	import { useAssessmentStore } from '@/store/modules/assessment.js'
+	import { useSurveyStore } from '@/store/modules/survey.js'
 	import { useAssessmentActions } from './composables/useAssessmentActions.js'
 	import { clearAssessmentLayers } from './utils/assessmentLayers.js'
 
@@ -129,7 +130,10 @@
 		return needBaseline && !workflowStore.isBaselineConfirmed
 	})
 
-	const goSurvey = () => router.push('/survey')
+	const goSurveyCompare = () => {
+		useSurveyStore().setStep('compare')
+		router.push({ path: '/survey', query: { step: 'compare' } })
+	}
 
 	const pickConfirmedEvent = async () => {
 		pickingEvent.value = true
