@@ -1,9 +1,10 @@
 /**
  * 灾情调查任务 / 灾害评估任务 / 报告导出 远程接口
- * 全部 quiet，失败由上层回落 MOCK
+ * Mock 回落由 withMockFallback + VITE_USE_MOCK 统一控制
  */
 import request from '@/utils/request.js'
 import { unwrapExecuteResult } from '@/api/withMockFallback.js'
+import { DisasterTypeEnum, ExposureEntityType, toDisasterType, toExposureType } from '@/constants/disasterEnums.js'
 
 const SURVEY_TASK = '/web-disaster-evaluate/web/disaster/evaluate/survey/task'
 const EVAL_TASK = '/web-disaster-evaluate/web/disaster/evaluate/task'
@@ -21,20 +22,38 @@ const loginName = () => {
 	}
 }
 
-/** 前端叠置目标 → 后端 targetEntity */
+/** 前端叠置目标 → 后端 targetEntity（兼容旧 StepCompute） */
 export const TARGET_ENTITY_MAP = {
 	population: 'Pop',
 	district: 'Xzq',
-	seawall: 'Dike',
-	fishing: 'Fishery',
-	mariculture: 'CultureArea',
-	tourist: 'TouristArea'
+	seawall: ExposureEntityType.SEAWALL,
+	fishing: ExposureEntityType.FISHING_PORT,
+	mariculture: ExposureEntityType.MARICULTURE,
+	tourist: ExposureEntityType.TOURIST_AREA,
+	SEAWALL: ExposureEntityType.SEAWALL,
+	FISHING_PORT: ExposureEntityType.FISHING_PORT,
+	MARICULTURE: ExposureEntityType.MARICULTURE,
+	TOURIST_AREA: ExposureEntityType.TOURIST_AREA
 }
 
 export const DISASTER_TYPE_MAP = {
 	storm: '1',
 	wind: '2',
-	wave: '3'
+	wave: '3',
+	[DisasterTypeEnum.STORM_SURGE]: '1',
+	[DisasterTypeEnum.SEA_WIND]: '2',
+	[DisasterTypeEnum.SEA_WAVE]: '3'
+}
+
+export function resolveTargetEntity(targetId) {
+	if (!targetId) return 'Pop'
+	if (TARGET_ENTITY_MAP[targetId]) return TARGET_ENTITY_MAP[targetId]
+	const code = toExposureType(targetId)
+	return code ? ExposureEntityType[code] : targetId
+}
+
+export function resolveDisasterTypeCode(typeId) {
+	return toDisasterType(typeId) || typeId
 }
 
 // ---------- 调查任务 ----------

@@ -1,8 +1,23 @@
 import { ElMessage } from 'element-plus'
 import { assessmentApi } from '@/api/assessment/index.js'
+import {
+	generateAssessmentReport,
+	listAssessmentRecords,
+	listAssessmentReports,
+	resolveDisasterType,
+	runComprehensive,
+	stormEconomicLoss,
+	stormIntegrate,
+	waveBehavior,
+	waveDamage,
+	windBehavior,
+	windDamage
+} from '@/api/assessment/pipeline.js'
 import { surveyApi } from '@/api/survey/index.js'
 import { findLatestEvaluateResult } from '@/api/taskResultHydrate.js'
+import { isMockEnabled } from '@/constants/disasterEnums.js'
 import { useAssessmentStore } from '@/store/modules/assessment.js'
+import { useDisasterWorkflowStore } from '@/store/modules/disasterWorkflow.js'
 import { useSurveyBaselineStore } from '@/store/modules/surveyBaseline.js'
 import { useMapStore } from '@/store/modules/map.js'
 import { getAssessType } from '@/views/assessment/constants.js'
@@ -53,8 +68,34 @@ const notice = (type, message, silent) => {
 export function useAssessmentActions() {
 	const store = useAssessmentStore()
 	const baselineStore = useSurveyBaselineStore()
+	const workflowStore = useDisasterWorkflowStore()
 
 	const currentScene = () => store.scenes.find(item => item.id === store.selectedSceneId) || store.scenes[0]
+
+	const requireEventId = () => {
+		if (!workflowStore.currentEventId) {
+			throw new Error('请先在灾情调查中绑定或创建灾害事件')
+		}
+		return workflowStore.currentEventId
+	}
+
+	const requireConfirmedBaseline = () => {
+		if (!workflowStore.isBaselineConfirmed) {
+			throw new Error('调查基线尚未确认锁定，请先完成灾情调查 Step4')
+		}
+		return workflowStore.currentBaseline
+	}
+
+	const syncWorkflow = async () => {
+		if (!workflowStore.currentEventId) return null
+		try {
+			await workflowStore.refreshEvent()
+			await workflowStore.refreshBaseline().catch(() => null)
+		} catch (e) {
+			/* 事件可能已失效 */
+		}
+		return workflowStore.currentEvent
+	}
 
 	/** 调查基线仍参与损失等计算，但不再上图（橙虚线受灾面 / 青绿叠置易误解） */
 	const applySurveyBaselineOnMap = () => {
@@ -102,8 +143,39 @@ export function useAssessmentActions() {
 			store.setStep(store.steps[0]?.id || 'integrate')
 		}
 		if (!store.districtKeyword) store.districtKeyword = DEFAULT_DISTRICT
+		await syncWorkflow()
+		if (workflowStore.currentEvent?.regionName && !store.districtKeyword) {
+			store.districtKeyword = workflowStore.currentEvent.regionName
+		}
+		try {
+			if (workflowStore.currentEventId) {
+				const records = await listAssessmentRecords(
+					workflowStore.currentEventId,
+					resolveDisasterType(store.currentType)
+				)
+				const integrateRec = (records || []).find(
+					r => String(r.subType || r.assessmentSubType || '').includes('INTEGRATION')
+				)
+				if (integrateRec?.result?.items) {
+					store.integrateList = integrateRec.result.items.map((item, idx) => ({
+						id: `INT-${idx}`,
+						status: '已标准化',
+						county: integrateRec.result.district || '',
+						hazardName: item.metric,
+						damage: `${item.value ?? ''}${item.unit || ''}`,
+						...item
+					}))
+				}
+			}
+		} catch (e) {
+			/* 无记录记录时再走台账 */
+		}
 		if (!store.integrateList.length) {
-			store.integrateList = await api.getIntegrateRecords()
+			try {
+				store.integrateList = await api.getIntegrateRecords()
+			} catch (e) {
+				store.integrateList = []
+			}
 		}
 		const scenes = await api.getSarScenes(store.currentType)
 		store.scenes = await enrichScenesWithLocalImages(scenes)
@@ -115,9 +187,15 @@ export function useAssessmentActions() {
 			store.selectedTyphoonId = store.typhoonEvents[0]?.id || ''
 		}
 		try {
-			store.archivedReports = await api.listArchivedReports()
+			store.archivedReports = await listAssessmentReports({
+				disasterType: resolveDisasterType(store.currentType)
+			})
 		} catch (e) {
-			store.archivedReports = []
+			try {
+				store.archivedReports = await api.listArchivedReports()
+			} catch (err) {
+				store.archivedReports = []
+			}
 		}
 		await waitForMap()
 		await baselineStore.loadByScene(store.selectedSceneId)
@@ -177,11 +255,61 @@ export function useAssessmentActions() {
 			ElMessage.warning('请完整填写区县、承灾体名称和受损情况')
 			return
 		}
+		try {
+			const eventId = requireEventId()
+			const items = [
+				{
+					metric: form.hazardName,
+					unit: '',
+					value: form.damage,
+					source: form.sourceId || '速报',
+					facility: form.facility,
+					level: form.level,
+					county: form.county,
+					city: form.city
+				},
+				...store.integrateList.map(row => ({
+					metric: row.hazardName || row.metric,
+					unit: row.unit || '',
+					value: row.value ?? row.damage,
+					source: row.source || '速报'
+				}))
+			]
+			const remote = await stormIntegrate(eventId, {
+				districtName: form.county,
+				quickReport: items,
+				items
+			})
+			const normalized = remote?.result?.items || []
+			if (normalized.length) {
+				store.integrateList = normalized.map((item, idx) => ({
+					id: `INT-${idx}`,
+					status: '已标准化',
+					county: form.county,
+					city: form.city,
+					hazardName: item.metric,
+					damage: `${item.value ?? ''}${item.unit || ''}`,
+					...item
+				}))
+			} else {
+				const saved = { ...form, id: `ST-${Date.now().toString().slice(-4)}`, status: '已标准化' }
+				store.integrateList = [saved, ...store.integrateList]
+			}
+			store.integrateForm = emptyIntegrateForm()
+			store.showIntegrateForm = false
+			ElMessage.success('已标准化入库并写入评估记录')
+			return
+		} catch (e) {
+			if (!isMockEnabled()) {
+				ElMessage.error(e?.message || '信息整合失败')
+				return
+			}
+		}
 		const saved = await api.saveIntegrateRecord(form)
 		store.integrateList = [saved, ...store.integrateList]
 		store.integrateForm = emptyIntegrateForm()
 		store.showIntegrateForm = false
-		ElMessage.success('已标准化入库')
+		ElMessage.success('已标准化入库（本地）')
 	}
 
 	const runLoss = async ({ silent = false, forceRefresh } = {}) => {
@@ -193,102 +321,55 @@ export function useAssessmentActions() {
 			}
 		}
 		if (!store.queriedDistrict) return
-		const refresh = forceRefresh ?? !silent
 		store.lossLoading = true
 		try {
+			await syncWorkflow()
+			requireConfirmedBaseline()
 			await loadSelectedSceneImage({ fly: !silent })
 			const district = store.queriedDistrict
 			const scene = currentScene()
 			store.lossResult = null
 
-			const hydrated = await api.hydrateLossResult({
-				typeId: store.currentType,
-				sceneId: store.selectedSceneId || scene?.id || '',
-				forceRefresh: refresh
-			})
-			if (hydrated?.lossResult) {
-				store.lossResult = hydrated.lossResult
-				store.evaluateTaskId = hydrated.taskId || store.evaluateTaskId
-				drawDistrict(district.feature)
-				const baseFeat = baselineStore.package?.affectedFeature
-				drawAffected(baseFeat || makeAffectedFeature(district))
-				applySurveyBaselineOnMap()
-				Object.keys(store.themeLayers || {}).forEach(id => {
-					if (store.themeLayers[id]) setThemeLayer(id, true)
-				})
-				notice('success', '经济损失预估完成（已回填服务端结果）', silent)
-				return
-			}
-
 			const ratio = scene?.inundationRatio || 0.46
-			const baselineArea = Number(baselineStore.package?.affectedMeta?.areaKm2) || 0
-			const fromSurvey = baselineArea > 0
-
-			if (!fromSurvey) {
-				const computed = await api.computeLossRemote({
-					typeId: store.currentType,
-					sceneId: store.selectedSceneId || scene?.id || '',
-					sceneName: scene?.name || '',
-					sceneDate: scene?.date || '',
-					districtName: district.name || '',
-					city: district.city || '',
-					statArea: district.statArea,
-					density: district.density,
-					inundationRatio: ratio
-				})
-				if (computed?.lossResult) {
-					store.lossResult = computed.lossResult
-					if (computed.taskId) store.evaluateTaskId = computed.taskId
-				}
-			}
-
-			if (!store.lossResult || fromSurvey) {
-				const affectedKm2 = fromSurvey
-					? baselineArea
-					: Number(((district.statArea || 680) * 0.078 * (0.72 + ratio)).toFixed(2))
-				const density = Number(baselineStore.package?.district?.density) || district.density || 500
-				const affectedPop = Math.round(density * affectedKm2)
-				const economy = await api.getCountyEconomy(district.name)
-				const loss = calcEconomicLoss(economy, affectedKm2)
-				const counties =
-					baselineStore.package?.affectedMeta?.counties?.length > 0
-						? baselineStore.package.affectedMeta.counties
-						: [
-								{
-									name: district.name,
-									city: district.city,
-									areaKm2: affectedKm2,
-									affectedPopulation: affectedPop
-								}
-							]
+			const baselineArea =
+				Number(workflowStore.currentBaseline?.affectedAreaKm2) ||
+				Number(baselineStore.package?.affectedMeta?.areaKm2) ||
+				0
+			const eventId = requireEventId()
+			const remote = await stormEconomicLoss(eventId, {
+				districtName: district.name || '',
+				city: district.city || '',
+				sceneId: store.selectedSceneId || scene?.id || '',
+				sceneName: scene?.name || '',
+				sceneDate: scene?.date || '',
+				statArea: district.statArea,
+				density: district.density,
+				inundationRatio: ratio,
+				affectedKm2: baselineArea > 0 ? baselineArea : undefined,
+				forceRefresh: forceRefresh ?? !silent
+			})
+			const lossPayload = remote?.lossResult || remote?.result || remote
+			if (lossPayload) {
 				store.lossResult = {
-					sceneName: scene?.name || '灾后遥感影像',
+					sceneName: lossPayload.sceneName || scene?.name || '灾后遥感影像',
 					sceneDate: scene?.date || '',
 					sensor: scene?.sensor || '孔径雷达卫星',
-					economy,
-					summary: {
-						areaKm2: affectedKm2,
-						countyCount: counties.length,
-						counties
+					economy: lossPayload.economy,
+					summary: lossPayload.summary || {
+						areaKm2: lossPayload.summary?.areaKm2,
+						countyCount: 1,
+						counties: [{ name: district.name, city: district.city }]
 					},
-					landHint: fromSurvey
-						? '受灾面积取自灾情调查基线，叠加县域 GDP 与土地利用结构测算分项损失。'
-						: '叠加县域 GDP 与土地利用结构（耕地、建设用地、养殖水面、林地、水域）测算分项损失；地图可叠加土地利用/人口/经济/详细规划专题。',
-					fromSurveyBaseline: fromSurvey,
-					...loss
+					landHint: '受灾面积取自已确认调查基线，由 /api/v1/assessment 风暴潮经济损失接口测算。',
+					fromSurveyBaseline: true,
+					totalLoss: lossPayload.totalLoss,
+					gdpShock: lossPayload.gdpShock,
+					landLoss: lossPayload.landLoss,
+					...lossPayload
 				}
-				try {
-					const taskId = await api.persistLossLiteTask({
-						typeId: store.currentType,
-						lossResult: store.lossResult,
-						sceneId: store.selectedSceneId || scene?.id || '',
-						districtName: district.name || ''
-					})
-					if (taskId) store.evaluateTaskId = taskId
-				} catch (e) {
-					/* 旁路落库失败不影响展示 */
-				}
+				store.evaluateTaskId = remote?.id || remote?.assessmentId || store.evaluateTaskId
 			}
+
 			drawDistrict(district.feature)
 			const baseFeat = baselineStore.package?.affectedFeature
 			drawAffected(baseFeat || makeAffectedFeature(district))
@@ -296,13 +377,34 @@ export function useAssessmentActions() {
 			Object.keys(store.themeLayers || {}).forEach(id => {
 				if (store.themeLayers[id]) setThemeLayer(id, true)
 			})
-			notice(
-				'success',
-				fromSurvey ? '经济损失预估完成（已引用调查基线面积）' : '经济损失预估完成',
-				silent
-			)
+			notice('success', '经济损失预估完成（已引用确认基线）', silent)
 		} catch (err) {
-			notice('error', '经济损失评估失败', silent)
+			if (isMockEnabled() && !String(err?.message || '').includes('基线')) {
+				try {
+					const district = store.queriedDistrict
+					const scene = currentScene()
+					const ratio = scene?.inundationRatio || 0.46
+					const baselineArea = Number(baselineStore.package?.affectedMeta?.areaKm2) || 0
+					const affectedKm2 =
+						baselineArea > 0
+							? baselineArea
+							: Number(((district.statArea || 680) * 0.078 * (0.72 + ratio)).toFixed(2))
+					const economy = await api.getCountyEconomy(district.name)
+					const loss = calcEconomicLoss(economy, affectedKm2)
+					store.lossResult = {
+						sceneName: scene?.name || '灾后遥感影像',
+						economy,
+						summary: { areaKm2: affectedKm2, countyCount: 1, counties: [{ name: district.name }] },
+						fromSurveyBaseline: baselineArea > 0,
+						...loss
+					}
+					notice('success', '经济损失预估完成（Mock）', silent)
+					return
+				} catch (e2) {
+					/* fallthrough */
+				}
+			}
+			notice('error', err?.message || '经济损失评估失败', silent)
 		} finally {
 			store.lossLoading = false
 		}
@@ -311,27 +413,50 @@ export function useAssessmentActions() {
 	const runDamage = async ({ silent = false } = {}) => {
 		store.damageLoading = true
 		try {
+			await syncWorkflow()
 			await loadSelectedSceneImage({ fly: !silent })
 			const kind = store.currentType === 'wave' ? 'wave' : 'wind'
 			const scene = currentScene()
 			if (store.selectedSceneId) {
 				await baselineStore.loadByScene(store.selectedSceneId)
 			}
-			const raw = kind === 'wave' ? await api.getWaveDamage() : await api.getWindDamage()
-			const scaled = scaleDamageByScene(raw, scene, kind)
-			store.damageRows = decorateDamageRows(scaled, kind)
+			const eventId = requireEventId()
+			const body = {
+				sceneName: scene?.name || '',
+				sarImageId: store.selectedSceneId || scene?.id || '',
+				maxWind: scene?.maxWind,
+				maxHeight: scene?.maxHeight
+			}
+			const remote = kind === 'wave' ? await waveDamage(eventId, body) : await windDamage(eventId, body)
+			const rows = remote?.result?.rows || remote?.rows
+			if (Array.isArray(rows) && rows.length) {
+				store.damageRows = decorateDamageRows(rows, kind)
+			} else if (isMockEnabled()) {
+				const raw = kind === 'wave' ? await api.getWaveDamage() : await api.getWindDamage()
+				const scaled = scaleDamageByScene(raw, scene, kind)
+				store.damageRows = decorateDamageRows(scaled, kind)
+			} else if (!Array.isArray(rows) || !rows.length) {
+				throw new Error('破坏性分析无结果，请检查评估接口返回')
+			}
 			drawImpact(damageRowsToFeatures(store.damageRows))
 			applySurveyBaselineOnMap()
-			const seawallHit = baselineStore.package?.overlayResults?.seawall?.totals?.count
-			notice(
-				'success',
-				seawallHit != null
-					? `破坏性分析完成（已叠加调查海堤叠置 ${seawallHit} 处）`
-					: `破坏性分析完成（${scene?.name || '当前场景'}）`,
-				silent
-			)
+			store.evaluateTaskId = remote?.id || store.evaluateTaskId
+			notice('success', `破坏性分析完成（${scene?.name || '当前场景'}）`, silent)
 		} catch (err) {
-			notice('error', '破坏性分析失败', silent)
+			if (isMockEnabled()) {
+				try {
+					const kind = store.currentType === 'wave' ? 'wave' : 'wind'
+					const scene = currentScene()
+					const raw = kind === 'wave' ? await api.getWaveDamage() : await api.getWindDamage()
+					store.damageRows = decorateDamageRows(scaleDamageByScene(raw, scene, kind), kind)
+					drawImpact(damageRowsToFeatures(store.damageRows))
+					notice('success', '破坏性分析完成（Mock）', silent)
+					return
+				} catch (e2) {
+					/* fallthrough */
+				}
+			}
+			notice('error', err?.message || '破坏性分析失败', silent)
 		} finally {
 			store.damageLoading = false
 		}
@@ -340,40 +465,72 @@ export function useAssessmentActions() {
 	const runBehavior = async ({ silent = false } = {}) => {
 		store.behaviorLoading = true
 		try {
+			await syncWorkflow()
 			await loadSelectedSceneImage({ fly: !silent })
+			const eventId = requireEventId()
+			const scene = currentScene()
 			if (store.currentType === 'wind') {
 				const event = store.typhoonEvents.find(item => item.id === store.selectedTyphoonId) || store.typhoonEvents[0]
-				const scene = currentScene()
-				const result = buildWindBehavior(event)
-				const windScale = Number(event?.maxWind || scene?.maxWind || 30) / 36
-				const structures = await api.getStructureDamage()
-				const inundationRows = scaleMetricRows(await api.getWindInundation(), windScale)
-				const inundationKm2 = Number(inundationRows.reduce((sum, item) => sum + item.areaKm2, 0).toFixed(2))
+				const remote = await windBehavior(eventId, {
+					eventName: event?.name,
+					maxWind: event?.maxWind || scene?.maxWind,
+					points: event?.points || event?.track || undefined,
+					sceneName: scene?.name
+				})
+				const remoteResult = remote?.result || remote
+				const local = buildWindBehavior(event)
+				const windScale = Number(remoteResult?.maxWind || event?.maxWind || scene?.maxWind || 30) / 36
+				const structures = isMockEnabled()
+					? await api.getStructureDamage().catch(() => [])
+					: await api.getStructureDamage()
+				const inundationRows = scaleMetricRows(
+					isMockEnabled()
+						? await api.getWindInundation().catch(() => [])
+						: await api.getWindInundation(),
+					windScale
+				)
+				const inundationKm2 =
+					Number(remoteResult?.inundationRadiusKm) ||
+					Number(inundationRows.reduce((sum, item) => sum + item.areaKm2, 0).toFixed(2))
 				const affectedPopulation = Math.round(
 					inundationRows.reduce((sum, item) => sum + (Number(item.population) || 0), 0)
 				)
 				store.behaviorResult = {
 					kind: 'wind',
-					...result,
+					...local,
+					maxWind: remoteResult?.maxWind || local.maxWind,
+					avgDir: remoteResult?.avgDir || local.avgDir,
 					scene,
-					structures: structures.map(item => ({
-						...item,
-						level: Math.min(4, Math.max(1, Number(item.level) || 3 - Math.round((windScale - 1) * 2)))
-					})),
+					structures,
 					inundationRows,
 					inundationKm2,
 					affectedPopulation,
-					desc: `依据台风「${event?.name || '-'}」路径及节点强度（最大风速 ${result.maxWind} m/s，主导风向 ${result.avgDir}），结合 ${scene?.name || 'SAR 风场'} 估测沿海淹没约 ${inundationKm2} km²，受灾人口约 ${affectedPopulation} 人。`
+					desc: `依据台风「${event?.name || remoteResult?.eventName || '-'}」与后端海风行为分析，最大风速 ${remoteResult?.maxWind || local.maxWind} m/s，估测影响半径约 ${inundationKm2} km。`
 				}
-				drawPath([result.pathFeature, ...result.pointFeatures])
+				drawPath([local.pathFeature, ...local.pointFeatures])
 				drawAffected(inundationRowsToFeatures(inundationRows))
 			} else {
-				const scene = currentScene()
-				const structures = await api.getStructureDamage()
-				const waveScale = Number(scene?.maxHeight || 4) / 4
-				const erosion = scaleMetricRows(await api.getWaveErosion(), waveScale)
-				const inundationKm2 = Number(erosion.reduce((sum, item) => sum + item.areaKm2, 0).toFixed(2))
-				const lengthKm = Number(erosion.reduce((sum, item) => sum + item.lengthKm, 0).toFixed(1))
+				const remote = await waveBehavior(eventId, {
+					sceneName: scene?.name,
+					maxHeight: scene?.maxHeight,
+					maxSpeed: scene?.maxSpeed,
+					period: scene?.period
+				})
+				const remoteResult = remote?.result || remote
+				const structures = isMockEnabled()
+					? await api.getStructureDamage().catch(() => [])
+					: await api.getStructureDamage()
+				const waveScale = Number(scene?.maxHeight || remoteResult?.maxHeight || 4) / 4
+				const erosion = scaleMetricRows(
+					isMockEnabled() ? await api.getWaveErosion().catch(() => []) : await api.getWaveErosion(),
+					waveScale
+				)
+				const inundationKm2 =
+					Number(remoteResult?.inundationKm2) ||
+					Number(erosion.reduce((sum, item) => sum + item.areaKm2, 0).toFixed(2))
+				const lengthKm =
+					Number(remoteResult?.lengthKm) ||
+					Number(erosion.reduce((sum, item) => sum + item.lengthKm, 0).toFixed(1))
 				const avgSpeed = scene?.maxSpeed ? Number((scene.maxSpeed * 0.82).toFixed(1)) : 11.1
 				store.behaviorResult = {
 					kind: 'wave',
@@ -383,18 +540,20 @@ export function useAssessmentActions() {
 					inundation: makeAffectedFeature(store.queriedDistrict),
 					inundationKm2,
 					lengthKm,
-					maxHeight: scene?.maxHeight || 4.8,
-					period: scene?.period || 9.2,
-					avgSpeed,
-					direction: 'ESE',
-					energyIndex: Math.round(((scene?.maxHeight || 4.8) ** 2) * 8),
-					desc: `依据 ${scene?.name || 'SAR 波浪场'}：波高 ${scene?.maxHeight || '-'} m、波速 ${scene?.maxSpeed || avgSpeed} m/s、波周期 ${scene?.period || '-'} s，估测海岸线侵蚀 ${lengthKm} km、范围约 ${inundationKm2} km²，并对海上结构造成冲击。`
+					maxHeight: remoteResult?.maxHeight || scene?.maxHeight || 4.8,
+					period: remoteResult?.period || scene?.period || 9.2,
+					avgSpeed: remoteResult?.avgSpeed || avgSpeed,
+					direction: remoteResult?.direction || 'ESE',
+					energyIndex: remoteResult?.energyIndex || Math.round(((scene?.maxHeight || 4.8) ** 2) * 8),
+					desc:
+						remoteResult?.desc ||
+						`依据 ${scene?.name || 'SAR 波浪场'} 海浪行为分析：侵蚀约 ${lengthKm} km、范围约 ${inundationKm2} km²。`
 				}
 				drawAffected(store.behaviorResult.inundation)
 			}
 			notice('success', '行为分析完成', silent)
 		} catch (err) {
-			notice('error', '行为分析失败', silent)
+			notice('error', err?.message || '行为分析失败', silent)
 		} finally {
 			store.behaviorLoading = false
 		}
@@ -430,31 +589,32 @@ export function useAssessmentActions() {
 		const typeLabel = getAssessType(store.currentType).label
 		const scene = currentScene()
 		store.reportExportPath = ''
-		const refresh = forceRefresh ?? openPreview
 		if (openPreview) store.reportGenerating = true
 		try {
-			const hydrated = await api.hydrateReportResult({
-				typeId: store.currentType,
-				sceneId: store.selectedSceneId || scene?.id || '',
-				forceRefresh: refresh
-			})
-			if (hydrated?.report) {
-				store.reportResult = hydrated.report
-				store.evaluateTaskId = hydrated.taskId || store.evaluateTaskId
-				if (openPreview) store.reportVisible = true
-				return
+			await syncWorkflow()
+			if (store.currentType === 'storm') {
+				requireConfirmedBaseline()
 			}
-
+			const eventId = requireEventId()
 			if (store.selectedSceneId) {
 				await baselineStore.loadByScene(store.selectedSceneId)
 			}
-			let surveySummary = null
-			try {
-				surveySummary = await api.getSurveyHazardSummary()
-			} catch (e) {
-				surveySummary = null
+
+			const body = {
+				typeId: store.currentType,
+				disasterType: resolveDisasterType(store.currentType),
+				sceneName: scene?.name || '',
+				structure: store.reportFactors.structure,
+				response: store.reportFactors.response,
+				prepare: store.reportFactors.prepare,
+				note: store.reportFactors.note,
+				forceRefresh: forceRefresh ?? openPreview
 			}
-			store.reportResult = buildComprehensiveReport({
+			const comprehensive = await runComprehensive(eventId, store.currentType, body)
+			const summary = comprehensive?.result || comprehensive
+			store.evaluateTaskId = comprehensive?.id || comprehensive?.assessmentId || store.evaluateTaskId
+
+			const localReport = buildComprehensiveReport({
 				typeId: store.currentType,
 				typeLabel,
 				district: store.queriedDistrict,
@@ -466,22 +626,43 @@ export function useAssessmentActions() {
 				overtoppingRows: store.overtoppingRows,
 				scene,
 				typhoon: store.typhoonEvents.find(item => item.id === store.selectedTyphoonId),
-				surveySummary,
+				surveySummary: null,
 				surveyBaseline: baselineStore.package
 			})
-			applySurveyBaselineOnMap()
-			try {
-				store.evaluateTaskId = await api.persistEvaluateLiteTask({
-					typeId: store.currentType,
-					report: store.reportResult,
-					factors: store.reportFactors,
-					sceneId: store.selectedSceneId || scene?.id || '',
-					districtName: store.queriedDistrict?.name || ''
-				})
-			} catch (e) {
-				store.evaluateTaskId = ''
+			store.reportResult = {
+				...localReport,
+				title: localReport.title || `${typeLabel}综合评估报告`,
+				grade: summary?.grade || localReport.grade,
+				total: summary?.totalScore ?? localReport.total,
+				totalScore: summary?.totalScore ?? localReport.total,
+				factors: summary?.factors || localReport.factors,
+				recommend: summary?.recommend || localReport.recommend,
+				assessmentId: comprehensive?.id,
+				eventId,
+				fromPipeline: true
 			}
+			applySurveyBaselineOnMap()
 			if (openPreview) store.reportVisible = true
+		} catch (err) {
+			if (isMockEnabled()) {
+				store.reportResult = buildComprehensiveReport({
+					typeId: store.currentType,
+					typeLabel,
+					district: store.queriedDistrict,
+					loss: store.lossResult,
+					damageRows: store.damageRows,
+					behavior: store.behaviorResult,
+					factors: store.reportFactors,
+					integrateList: store.integrateList,
+					overtoppingRows: store.overtoppingRows,
+					scene,
+					typhoon: store.typhoonEvents.find(item => item.id === store.selectedTyphoonId),
+					surveyBaseline: baselineStore.package
+				})
+				if (openPreview) store.reportVisible = true
+				return
+			}
+			ElMessage.error(err?.message || '综合评估失败')
 		} finally {
 			if (openPreview) store.reportGenerating = false
 		}
@@ -499,31 +680,63 @@ export function useAssessmentActions() {
 	}
 
 	const archiveReport = async ({ remark = '', archivedBy = '评估归档员' } = {}) => {
-		if (!store.reportResult) {
-			await runReport({ openPreview: false })
+		try {
+			await syncWorkflow()
+			const eventId = requireEventId()
+			if (!store.reportResult) {
+				await runReport({ openPreview: false })
+			}
+			if (!store.reportResult) {
+				ElMessage.warning('请先生成评估报告')
+				return null
+			}
+			const scene = currentScene()
+			const saved = await generateAssessmentReport(eventId, {
+				typeId: store.currentType,
+				disasterType: resolveDisasterType(store.currentType),
+				reportTitle: store.reportResult.title,
+				sceneName: scene?.name || store.reportResult.sceneName,
+				remark,
+				archivedBy
+			})
+			store.archivedReports = await listAssessmentReports({
+				disasterType: resolveDisasterType(store.currentType)
+			})
+			if (saved?.snapshot) {
+				store.reportResult = {
+					...store.reportResult,
+					...saved.snapshot,
+					reportNo: saved.reportNo,
+					downloadPath: saved.downloadPath || saved.reportFilePath
+				}
+			}
+			ElMessage.success(`报告已归档：${saved.reportNo || saved.id}`)
+			return saved
+		} catch (e) {
+			ElMessage.error(e?.message || '报告归档失败')
+			throw e
 		}
-		if (!store.reportResult) {
-			ElMessage.warning('请先生成评估报告')
-			return null
-		}
-		const saved = await api.archiveAssessmentReport(store.reportResult, {
-			typeId: store.currentType,
-			remark,
-			archivedBy
-		})
-		store.archivedReports = await api.listArchivedReports()
-		ElMessage.success(`报告已归档：${saved.reportNo}`)
-		return saved
 	}
 
 	const openArchivedReport = async id => {
-		const row = await api.getArchivedReport(id)
-		if (!row?.snapshot) {
-			ElMessage.warning('未找到归档报告')
-			return
+		try {
+			const row = await api.getArchivedReport(id)
+			const snap = row?.snapshot
+			if (!snap) {
+				ElMessage.warning('未找到归档报告')
+				return
+			}
+			store.reportResult = {
+				...snap,
+				title: snap.title || row.title || snap.eventName,
+				grade: snap.grade || row.grade,
+				total: snap.totalScore ?? row.totalScore,
+				reportNo: row.reportNo
+			}
+			store.reportVisible = true
+		} catch (e) {
+			ElMessage.error(e?.message || '打开归档报告失败')
 		}
-		store.reportResult = row.snapshot
-		store.reportVisible = true
 	}
 
 	const ensureAssessmentStepResult = async (step = store.currentStep) => {
@@ -535,6 +748,10 @@ export function useAssessmentActions() {
 		}
 		if (step === 'loss') {
 			await ensureDistrict()
+			if (!workflowStore.isBaselineConfirmed) {
+				await loadSelectedSceneImage({ fly: false })
+				return
+			}
 			if (!store.lossResult) await runLoss({ silent: true })
 			else await loadSelectedSceneImage({ fly: false })
 			return
@@ -565,9 +782,13 @@ export function useAssessmentActions() {
 			return
 		}
 		if (step === 'report') {
-			// 进入综合评估：自动按当前场景复盘，右侧结果面板 loading 等待
+			// 进入综合评估：自动按当前场景复盘；风暴潮需已确认基线
 			if (!store.selectedSceneId && store.scenes[0]) {
 				store.selectedSceneId = store.scenes[0].id
+			}
+			if (store.currentType === 'storm' && !workflowStore.isBaselineConfirmed) {
+				await loadSelectedSceneImage({ fly: false })
+				return
 			}
 			store.reportLoading = true
 			try {
@@ -655,6 +876,9 @@ export function useAssessmentActions() {
 		openArchivedReport,
 		replayScenario,
 		ensureAssessmentStepResult,
-		destroyAssessment
+		destroyAssessment,
+		workflowStore,
+		syncWorkflow,
+		requireConfirmedBaseline
 	}
 }

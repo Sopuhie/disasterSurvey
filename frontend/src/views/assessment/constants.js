@@ -2,7 +2,7 @@ export const ASSESS_TYPES = [
 	{
 		id: 'storm',
 		label: '风暴潮',
-		path: '/disasterAssessment',
+		path: '/assessment/storm-surge',
 		steps: [
 			{ id: 'integrate', label: '信息整合', index: 1, desc: '速报数据标准化入库' },
 			{ id: 'loss', label: '经济损失', index: 2, desc: '区划定位、专题叠加与损失测算' },
@@ -12,7 +12,7 @@ export const ASSESS_TYPES = [
 	{
 		id: 'wind',
 		label: '海风',
-		path: '/disasterAssessment',
+		path: '/assessment/sea-wind',
 		steps: [
 			{ id: 'damage', label: '破坏性分析', index: 1, desc: 'SAR 海面风场破坏等级分析' },
 			{ id: 'behavior', label: '行为分析', index: 2, desc: '台风过程监测与淹没估测' },
@@ -22,7 +22,7 @@ export const ASSESS_TYPES = [
 	{
 		id: 'wave',
 		label: '海浪',
-		path: '/disasterAssessment',
+		path: '/assessment/sea-wave',
 		steps: [
 			{ id: 'damage', label: '破坏性分析', index: 1, desc: 'SAR 波浪场破坏等级分析' },
 			{ id: 'behavior', label: '行为分析', index: 2, desc: '波高波速与岸线侵蚀估测' },
@@ -31,13 +31,15 @@ export const ASSESS_TYPES = [
 	}
 ]
 
+/** 规范路由段 → 评估类型；历史别名仅作兼容解析，不再作为正式路由 */
 export const ROUTE_TYPE_MAP = {
 	storm: 'storm',
-	economic: 'storm',
+	'storm-surge': 'storm',
 	wind: 'wind',
-	seabreeze: 'wind',
+	'sea-wind': 'wind',
 	wave: 'wave',
-	seawave: 'wave'
+	'sea-wave': 'wave',
+	reports: 'storm'
 }
 
 export const LAYER_NAMES = {

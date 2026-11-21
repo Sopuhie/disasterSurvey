@@ -3,10 +3,8 @@ package com.santech.module.biz.service;
 import com.santech.framework.global.ExecuteResult;
 
 /**
- * @Title: EvaluateTaskExeService.java 
- * @Description：任务执行相关接口类 
- * @Version： V1.0
- * @Modify：   
+ * 旧版任务执行接口（兼容保留）。
+ * 新代码请使用 {@link com.santech.module.biz.engine.ExternalModelExecutor}。
  */
 public interface EvaluateTaskExeService {
 	

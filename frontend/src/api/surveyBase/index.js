@@ -1,6 +1,7 @@
 import { surveyBaseMockStore } from './mockStore.js'
 import { SURVEY_BASE_TYPES, ASSESS_BASE_TYPES } from './schemas.js'
 import { withMockFallback, isNonEmptyList } from '@/api/withMockFallback.js'
+import { ExposureEntityType, isMockEnabled, toExposureLegacyId } from '@/constants/disasterEnums.js'
 import {
 	getExposureTypeByHazard,
 	remoteBizBatchSave,
@@ -107,8 +108,9 @@ const applyClientFilters = (list, type, params = {}) => {
 }
 
 /**
- * 灾情调查/评估基础数据 API。
- * 优先真实后端；接口失败或无数据时回落 localStorage MOCK。
+ * 运维台账 API（县市/承灾体/评估样本等）。
+ * 业务主路径请走 /api/v1/survey、/api/v1/assessment；
+ * 此处仍调用已废弃的 bizdata 万能表，仅供运维管理过渡。
  */
 export function surveyBaseApi() {
 	return {
@@ -170,8 +172,9 @@ export function surveyBaseApi() {
 					return { code: 200, data: remote, resultMsg: '新增成功', resultCode: 'S', source: 'remote' }
 				}
 			} catch (e) {
-				/* fallthrough mock */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('新增失败：后端未返回数据')
 			await wait()
 			const row = surveyBaseMockStore.create(type, payload)
 			return { code: 200, data: row, resultMsg: '新增成功（本地 MOCK）', resultCode: 'S', source: 'mock' }
@@ -192,8 +195,9 @@ export function surveyBaseApi() {
 					return { code: 200, data: remote, resultMsg: '更新成功', resultCode: 'S', source: 'remote' }
 				}
 			} catch (e) {
-				/* fallthrough */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('更新失败：后端未返回数据')
 			await wait()
 			const exists = surveyBaseMockStore.getById(type, payload.id)
 			const row = exists
@@ -207,7 +211,7 @@ export function surveyBaseApi() {
 			try {
 				await remoteBizDelete(id)
 			} catch (e) {
-				/* still remove local */
+				if (!isMockEnabled()) throw e
 			}
 			await wait()
 			try {
@@ -364,8 +368,15 @@ export function surveyBaseApi() {
 
 		/** 承灾体树（后端 exposure/tree），空则回落列表拼简易树 */
 		getExposureTree: async hazardType => {
+			const legacy = toExposureLegacyId(hazardType)
 			const exposureType =
-				{ seawall: 'Dike', fishing: 'Fishery', mariculture: 'CultureArea', tourist: 'TouristArea' }[hazardType] ||
+				{
+					seawall: ExposureEntityType.SEAWALL,
+					fishing: ExposureEntityType.FISHING_PORT,
+					mariculture: ExposureEntityType.MARICULTURE,
+					tourist: ExposureEntityType.TOURIST_AREA
+				}[legacy] ||
+				ExposureEntityType[hazardType] ||
 				hazardType
 			const { data } = await withMockFallback(
 				() => remoteExposureTree(exposureType),

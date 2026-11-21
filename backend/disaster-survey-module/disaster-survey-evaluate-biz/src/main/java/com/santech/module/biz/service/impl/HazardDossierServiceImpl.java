@@ -332,6 +332,15 @@ public class HazardDossierServiceImpl implements HazardDossierService {
 		BizHazardDossierModel model = exist != null ? exist : new BizHazardDossierModel();
 		model.setId(id);
 		model.setBizKey(key);
+		model.setEventId(str(dossier.get("eventId")));
+		model.setBaselineId(str(dossier.get("baselineId")));
+		model.setExposureType(str(dossier.get("exposureType")));
+		model.setExposureId(str(dossier.get("exposureId")));
+		model.setRsClipImageUrl(str(dossier.get("rsClipImageUrl")));
+		Object fieldAttachments = dossier.get("fieldAttachments");
+		if (fieldAttachments != null) {
+			model.setFieldAttachmentsJson(JSON.toJSONString(fieldAttachments));
+		}
 		model.setHazardType(hazardType);
 		model.setHazardName(hazardName);
 		model.setVerifyStatus(str(dossier.get("verifyStatus")));
@@ -365,6 +374,11 @@ public class HazardDossierServiceImpl implements HazardDossierService {
 				map = new HashMap<>();
 			}
 			map.put("id", row.getId());
+			map.put("eventId", row.getEventId());
+			map.put("baselineId", row.getBaselineId());
+			map.put("exposureType", row.getExposureType());
+			map.put("exposureId", row.getExposureId());
+			map.put("rsClipImageUrl", row.getRsClipImageUrl());
 			map.put("hazardType", row.getHazardType());
 			map.put("hazardName", row.getHazardName());
 			if (StringUtil.isNotEmpty(row.getVerifyStatus())) {

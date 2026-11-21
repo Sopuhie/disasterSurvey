@@ -13,7 +13,8 @@ import santech.common.dbcomponent.entity.annotations.PrimaryKey;
 import santech.common.dbcomponent.entity.annotations.Table;
 
 /**
- * 调查对象档案（现场资料 / 附件 / 核对 / 归档）
+ * 调查对象档案（现场资料 / 附件 / 核对 / 归档）。
+ * 补充 event_id / baseline_id / exposure_type 主线关联字段。
  */
 @Data
 @Table(name = "T_BIZ_HAZARD_DOSSIER")
@@ -27,12 +28,36 @@ public class BizHazardDossierModel implements Serializable {
 	@ApiModelProperty("主键")
 	private String id;
 
+	@Column(name = "EVENT_ID")
+	@ApiModelProperty("关联灾害事件ID")
+	private String eventId;
+
+	@Column(name = "BASELINE_ID")
+	@ApiModelProperty("关联调查基线ID")
+	private String baselineId;
+
+	@Column(name = "EXPOSURE_TYPE")
+	@ApiModelProperty("承灾体类型，取自 ExposureTypeEnum")
+	private String exposureType;
+
+	@Column(name = "EXPOSURE_ID")
+	@ApiModelProperty("承灾体业务ID")
+	private String exposureId;
+
+	@Column(name = "RS_CLIP_IMAGE_URL")
+	@ApiModelProperty("导出的承灾体遥感影像路径")
+	private String rsClipImageUrl;
+
+	@Column(name = "FIELD_ATTACHMENTS_JSON")
+	@ApiModelProperty("现场核查照片/附件 JSON")
+	private String fieldAttachmentsJson;
+
 	@Column(name = "BIZ_KEY")
-	@ApiModelProperty("业务键：hazardType::hazardName")
+	@ApiModelProperty("业务键：hazardType::hazardName（兼容旧链路）")
 	private String bizKey;
 
 	@Column(name = "HAZARD_TYPE")
-	@ApiModelProperty("承灾体类型 seawall/fishing/mariculture/tourist")
+	@ApiModelProperty("承灾体类型旧编码 seawall/fishing/mariculture/tourist（兼容）")
 	private String hazardType;
 
 	@Column(name = "HAZARD_NAME")

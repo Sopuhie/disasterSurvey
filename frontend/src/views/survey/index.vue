@@ -7,6 +7,7 @@
 					<div>
 						<h3>灾情调查</h3>
 						<p>{{ currentStepMeta?.label }} · {{ currentStepMeta?.desc }}</p>
+						<p v-if="eventHint" class="survey-event-hint">{{ eventHint }}</p>
 					</div>
 					<span class="survey-left-collapse flex faj cp" title="收起面板" @click="setLeftCollapsed(true)">
 						<el-icon :size="16"><DArrowLeft /></el-icon>
@@ -73,18 +74,27 @@
 	import ComparePanel from './components/ComparePanel.vue'
 	import ResultPanel from './components/ResultPanel.vue'
 	import { DArrowLeft } from '@element-plus/icons-vue'
+	import { computed } from 'vue'
 	import { SURVEY_STEPS } from './constants.js'
+	import { BaselineStatusLabel } from '@/constants/disasterEnums.js'
 	import { useAppStore } from '@/store/modules/app.js'
 	import { useSurveyStore } from '@/store/modules/survey.js'
 	import { useSurveyActions } from './composables/useSurveyActions.js'
 
 	const appStore = useAppStore()
 	const surveyStore = useSurveyStore()
-	const { initSurvey, destroySurvey, ensureSurveyStepResult } = useSurveyActions()
+	const { initSurvey, destroySurvey, ensureSurveyStepResult, workflowStore } = useSurveyActions()
 	const steps = SURVEY_STEPS
 
 	const currentStepMeta = computed(() => steps.find(item => item.id === surveyStore.currentStep) || steps[0])
 	const nextStep = computed(() => steps.find(item => item.index === currentStepMeta.value.index + 1))
+	const eventHint = computed(() => {
+		const name = workflowStore.currentEvent?.eventName || workflowStore.currentEventId
+		if (!name) return ''
+		const st = workflowStore.currentBaseline?.status
+		const stLabel = st ? BaselineStatusLabel[st] || st : '未确认'
+		return `事件：${name} · 基线：${stLabel}`
+	})
 
 	const setLeftCollapsed = collapsed => {
 		surveyStore.setLeftPanelCollapsed(collapsed)
@@ -141,6 +151,11 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 8px;
+	}
+	.survey-event-hint {
+		margin-top: 4px;
+		font-size: 12px;
+		color: #5c6b7a;
 	}
 	.survey-left-collapse {
 		flex-shrink: 0;

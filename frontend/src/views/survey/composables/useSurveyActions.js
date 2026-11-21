@@ -1,9 +1,18 @@
 import { ElMessage } from 'element-plus'
 import { surveyApi } from '@/api/survey/index.js'
+import {
+	compareQuickReport,
+	confirmSurveyBaseline,
+	exportExposureImages,
+	runOverlayAnalysis,
+	saveAffectedArea
+} from '@/api/survey/pipeline.js'
 import { makeSystemHazardFeature } from '@/api/surveyBase/hazardFeatures.js'
+import { BaselineStatusEnum, isMockEnabled } from '@/constants/disasterEnums.js'
+import { useDisasterWorkflowStore } from '@/store/modules/disasterWorkflow.js'
 import { useSurveyStore } from '@/store/modules/survey.js'
 import { useSurveyBaselineStore } from '@/store/modules/surveyBaseline.js'
-import { getOverlayTarget } from '@/views/survey/constants.js'
+import { getHazardExposureType, getOverlayTarget } from '@/views/survey/constants.js'
 import { buildCompareSeries } from '@/views/survey/utils/overlayEngine.js'
 import { clearSurveyLayers, drawAffectedArea, drawDistrict, drawHazard, drawOverlay, drawSceneImage } from '@/views/survey/utils/surveyLayers.js'
 import { ExportPicture, PictureType } from '@/components/map/primitive/control/ExportPicture.js'
@@ -32,6 +41,7 @@ const notice = (type, message, silent) => {
 export function useSurveyActions() {
 	const surveyStore = useSurveyStore()
 	const baselineStore = useSurveyBaselineStore()
+	const workflowStore = useDisasterWorkflowStore()
 	const mapStore = useMapStore()
 
 	const publishBaseline = async () => {
@@ -42,6 +52,19 @@ export function useSurveyActions() {
 		}
 	}
 
+	const requireEventId = () => {
+		if (!workflowStore.currentEventId) {
+			throw new Error('请先绑定或创建灾害事件')
+		}
+		return workflowStore.currentEventId
+	}
+
+	const syncPipelineBaseline = remote => {
+		if (remote && (remote.baselineId || remote.id || remote.status)) {
+			workflowStore.applyBaselineFromRemote(remote)
+		}
+	}
+
 	const loadSelectedSceneImage = async ({ fly = true } = {}) => {
 		const scene = surveyStore.scenes.find(item => item.id === surveyStore.selectedSceneId) || surveyStore.scenes[0]
 		await waitForMap()
@@ -49,6 +72,17 @@ export function useSurveyActions() {
 	}
 
 	const initSurvey = async () => {
+		try {
+			await workflowStore.ensureEvent({
+				regionName: surveyStore.districtKeyword || DEFAULT_DISTRICT,
+				districtName: surveyStore.districtKeyword || DEFAULT_DISTRICT
+			})
+		} catch (e) {
+			if (!isMockEnabled()) {
+				ElMessage.error(e?.message || '创建/绑定灾害事件失败，请检查后端服务')
+				return
+			}
+		}
 		const scenes = await api.getRemoteSensingScenes()
 		surveyStore.scenes = await enrichScenesWithLocalImages(scenes)
 		if (!surveyStore.selectedSceneId) {
@@ -167,6 +201,8 @@ export function useSurveyActions() {
 		surveyStore.overlayResults = {}
 		surveyStore.overlayResult = null
 		surveyStore.compareRows = []
+		surveyStore.compareMetricRows = []
+		surveyStore.compareChart = null
 
 		let feature = item.feature
 		if (!feature?.geometry) {
@@ -212,6 +248,10 @@ export function useSurveyActions() {
 
 	const identifyAffectedArea = async ({ silent = false } = {}) => {
 		if (surveyStore.identifying) return
+		if (workflowStore.isBaselineConfirmed) {
+			notice('warning', '调查基线已锁定，不可重新识别', silent)
+			return
+		}
 		surveyStore.identifying = true
 		surveyStore.identifyProgress = silent ? 60 : 8
 		const timer = silent
@@ -233,11 +273,27 @@ export function useSurveyActions() {
 			surveyStore.overlayResult = null
 			surveyStore.overlayTaskId = ''
 			if (feature) drawAffectedArea(feature)
+
+			// 对接 /api/v1/survey 主线：保存受灾范围到事件基线
+			const eventId = requireEventId()
+			const remote = await saveAffectedArea(eventId, {
+				affectedAreaGeojson: feature ? JSON.stringify(feature) : '',
+				geojson: feature ? JSON.stringify(feature) : '',
+				rsImageId: surveyStore.selectedSceneId,
+				sceneId: surveyStore.selectedSceneId,
+				sceneName: meta?.sceneName,
+				sceneDate: meta?.sceneDate,
+				districtName: surveyStore.queriedDistrict?.name || '',
+				city: surveyStore.queriedDistrict?.city || '',
+				inundationRatio: meta?.inundationRatio
+			})
+			syncPipelineBaseline(remote)
+
 			surveyStore.identifyProgress = 100
 			await publishBaseline()
 			notice('success', '受灾范围识别完成', silent)
 		} catch (err) {
-			notice('error', '受灾范围识别失败', silent)
+			notice('error', err?.message || '受灾范围识别失败', silent)
 		} finally {
 			if (timer) clearInterval(timer)
 			surveyStore.identifying = false
@@ -245,6 +301,10 @@ export function useSurveyActions() {
 	}
 
 	const runOverlay = async (targetId = surveyStore.overlayTarget, { silent = false } = {}) => {
+		if (workflowStore.isBaselineConfirmed) {
+			notice('warning', '调查基线已锁定，不可重新叠置', silent)
+			return surveyStore.overlayResult
+		}
 		if (!surveyStore.affectedFeature) {
 			if (silent) {
 				await identifyAffectedArea({ silent: true })
@@ -279,11 +339,27 @@ export function useSurveyActions() {
 				surveyStore.selectedHazardType = targetId
 				surveyStore.compareType = targetId
 			}
+
+			// 对接主线：全量叠置 + 影像导出清单
+			const eventId = requireEventId()
+			const remoteOverlay = await runOverlayAnalysis(eventId, {
+				sceneId: surveyStore.selectedSceneId,
+				districtName: surveyStore.queriedDistrict?.name || '',
+				city: surveyStore.queriedDistrict?.city || '',
+				affectedAreaGeojson: JSON.stringify(surveyStore.affectedFeature)
+			})
+			syncPipelineBaseline(remoteOverlay)
+			const exported = await exportExposureImages(eventId, {
+				rsImageId: surveyStore.selectedSceneId
+			})
+			syncPipelineBaseline(exported)
+			surveyStore.imageExports = exported?.exports || null
+
 			await publishBaseline()
 			notice('success', `${target?.label || ''}叠置分析完成，共 ${result.totals.count} 条`, silent)
 			return result
 		} catch (err) {
-			notice('error', '叠置分析失败', silent)
+			notice('error', err?.message || '叠置分析失败', silent)
 			return null
 		} finally {
 			surveyStore.overlaying = false
@@ -302,9 +378,79 @@ export function useSurveyActions() {
 		const targetName =
 			surveyStore.selectedHazard && surveyStore.selectedHazardType === typeId ? surveyStore.selectedHazard.name : ''
 		const reports = await api.getReportedLoss({ hazardType: typeId, targetName })
-		surveyStore.compareRows = buildCompareSeries(overlayResult, reports, targetName)
+		const series = buildCompareSeries(overlayResult, reports, targetName)
+		surveyStore.compareRows = series
+
+		// 对接主线：速报对比核查；右侧图表保留 series 结构，同时消费后端 chart
+		try {
+			const eventId = requireEventId()
+			const monitor = series[0] || {}
+			const reportAgg = series.slice(1).reduce(
+				(acc, row) => ({
+					population: acc.population + (Number(row.population) || 0),
+					area: acc.area + (Number(row.area) || 0),
+					loss: acc.loss + (Number(row.loss) || 0)
+				}),
+				{ population: 0, area: 0, loss: 0 }
+			)
+			const reportCount = Math.max(series.length - 1, 1)
+			const quickItems = [
+				{
+					metric: '受灾人口',
+					unit: '人',
+					rsValue: Number(monitor.population) || 0,
+					quickValue: reportAgg.population / reportCount
+				},
+				{
+					metric: '受灾面积',
+					unit: 'km²',
+					rsValue: Number(monitor.area) || 0,
+					quickValue: reportAgg.area / reportCount
+				},
+				{
+					metric: '经济损失',
+					unit: '万元',
+					rsValue: Number(monitor.loss) || 0,
+					quickValue: reportAgg.loss / reportCount
+				}
+			]
+			const remote = await compareQuickReport(eventId, {
+				quickReport: quickItems,
+				items: quickItems
+			})
+			syncPipelineBaseline(remote)
+			const compare = remote?.compare
+			if (compare?.chart) {
+				surveyStore.compareChart = compare.chart
+			}
+			if (compare?.rows?.length) {
+				surveyStore.compareMetricRows = compare.rows
+			}
+		} catch (e) {
+			if (!isMockEnabled()) throw e
+		}
+
 		await publishBaseline()
 		if (!silent && overlayResult) ElMessage.success('对比结果已生成')
+	}
+
+	const confirmBaseline = async () => {
+		if (workflowStore.isBaselineConfirmed) {
+			ElMessage.info('调查基线已确认锁定')
+			return workflowStore.currentBaseline
+		}
+		try {
+			const eventId = requireEventId()
+			const baseline = await confirmSurveyBaseline(eventId, {
+				remark: '前端 Step4 确认锁定'
+			})
+			workflowStore.applyBaselineFromRemote(baseline)
+			ElMessage.success('调查基线已确认锁定，可作为灾害评估输入')
+			return baseline
+		} catch (e) {
+			ElMessage.error(e?.message || '基线确认失败')
+			throw e
+		}
 	}
 
 	const ensureSurveyStepResult = async (step = surveyStore.currentStep, { selectFirstHazard = false } = {}) => {
@@ -392,8 +538,12 @@ export function useSurveyActions() {
 		identifyAffectedArea,
 		runOverlay,
 		loadCompare,
+		confirmBaseline,
 		ensureSurveyStepResult,
 		exportOverlayImage,
-		destroySurvey
+		destroySurvey,
+		workflowStore,
+		BaselineStatusEnum,
+		getHazardExposureType
 	}
 }

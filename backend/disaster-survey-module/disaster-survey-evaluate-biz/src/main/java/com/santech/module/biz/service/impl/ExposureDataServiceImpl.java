@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.santech.core.framework.dao.ExposureDao;
+import com.santech.core.framework.entity.enums.biz.ExposureTypeEnum;
 import com.santech.core.framework.entity.model.QxRegionSimpleModel;
 import com.santech.core.framework.entity.model.exposure.BaseCultureAreaModel;
 import com.santech.core.framework.entity.model.exposure.BaseDikeModel;
@@ -42,6 +43,11 @@ public class ExposureDataServiceImpl implements ExposureDataService {
     @Override
    	public ExecuteResult<List<ExposureTreeVo>> queryExposureTreeInfos(String exposureType) {
            try {
+        	 ExposureTypeEnum typeEnum = ExposureTypeEnum.fromAny(exposureType);
+        	 if (typeEnum == null) {
+        		 return ExecuteResult.error("查询失败-不能识别的承灾体类型，请使用 SEAWALL/FISHING_PORT/MARICULTURE/TOURIST_AREA",null);
+        	 }
+        	 String entityType = typeEnum.getEntityType();
         	 //请求参数
                Map<String,Object> params = new HashMap<String,Object>();
                //拼接查询sql
@@ -53,7 +59,7 @@ public class ExposureDataServiceImpl implements ExposureDataService {
             	   return ExecuteResult.error("查询失败",null);
                }
                List<ExposureTreeVo> exposureTree = null;
-               switch (exposureType) {
+               switch (entityType) {
 	   			case "Dike":
 	   				//根据拼接sql,调用dao层获取数据
 	                List<BaseDikeModel> dikeDatas = exposureDao.queryDangerObjects(BaseDikeModel.class, (String) dbParams.get("sql"),(Map<String, Object>) dbParams.get("paramsMap"));
@@ -279,6 +285,11 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 	@Override
 	public ExecuteResult<List<Map<String, Object>>> queryExposureList(String exposureType, String keyword) {
 		try {
+			ExposureTypeEnum typeEnum = ExposureTypeEnum.fromAny(exposureType);
+			if (typeEnum == null) {
+				return ExecuteResult.error("不能识别的承灾体类型，请使用 SEAWALL/FISHING_PORT/MARICULTURE/TOURIST_AREA",
+						new ArrayList<>());
+			}
 			Map<String, Object> params = new HashMap<String, Object>();
 			Map<String, Object> dbParams = CommonUtils.getWhereSearchSql(params, "SORTINDEX asc", "");
 			String sql = (String) dbParams.get("sql");
@@ -286,9 +297,8 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 			Map<String, Object> paramsMap = (Map<String, Object>) dbParams.get("paramsMap");
 			List<Map<String, Object>> result = new ArrayList<>();
 			String kw = keyword == null ? "" : keyword.trim();
-			switch (exposureType) {
-			case "Dike":
-			case "seawall":
+			switch (typeEnum) {
+			case SEAWALL:
 				for (BaseDikeModel item : exposureDao.queryDangerObjects(BaseDikeModel.class, sql, paramsMap)) {
 					if (!matchKeyword(kw, item.getName(), item.getCode(), item.getRegionName())) {
 						continue;
@@ -297,8 +307,10 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					row.put("id", item.getId());
 					row.put("name", item.getName());
 					row.put("dangerName", item.getName());
+					row.put("exposureType", typeEnum.getCode());
 					row.put("hazardCode", item.getCode());
 					row.put("division", item.getRegionName());
+					row.put("regionCode", item.getRegionCode());
 					row.put("length", item.getLength());
 					row.put("lengthKm", item.getLength());
 					row.put("Dam_elevat", item.getHtd());
@@ -309,8 +321,7 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					result.add(row);
 				}
 				break;
-			case "Fishery":
-			case "fishing":
+			case FISHING_PORT:
 				for (BaseFisheryModel item : exposureDao.queryDangerObjects(BaseFisheryModel.class, sql, paramsMap)) {
 					if (!matchKeyword(kw, item.getName(), item.getCode(), item.getAddress())) {
 						continue;
@@ -318,8 +329,10 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					Map<String, Object> row = new HashMap<>();
 					row.put("id", item.getId());
 					row.put("name", item.getName());
+					row.put("exposureType", typeEnum.getCode());
 					row.put("hazardCode", item.getCode());
 					row.put("division", item.getAddress());
+					row.put("regionCode", item.getRegionCode());
 					row.put("type", item.getGrade());
 					row.put("method", item.getBreakWater());
 					row.put("capacity", item.getCapacity());
@@ -329,8 +342,7 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					result.add(row);
 				}
 				break;
-			case "CultureArea":
-			case "mariculture":
+			case MARICULTURE:
 				for (BaseCultureAreaModel item : exposureDao.queryDangerObjects(BaseCultureAreaModel.class, sql, paramsMap)) {
 					if (!matchKeyword(kw, item.getName(), item.getCode())) {
 						continue;
@@ -338,7 +350,9 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					Map<String, Object> row = new HashMap<>();
 					row.put("id", item.getId());
 					row.put("name", item.getName());
+					row.put("exposureType", typeEnum.getCode());
 					row.put("hazardCode", item.getCode());
+					row.put("regionCode", item.getRegionCode());
 					row.put("method", item.getType());
 					row.put("area", item.getArea());
 					row.put("areaKm2", item.getArea() == null ? null : item.getArea().doubleValue() * 0.01);
@@ -348,8 +362,7 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					result.add(row);
 				}
 				break;
-			case "TouristArea":
-			case "tourist":
+			case TOURIST_AREA:
 				for (BaseTouristAreaModel item : exposureDao.queryDangerObjects(BaseTouristAreaModel.class, sql, paramsMap)) {
 					if (!matchKeyword(kw, item.getName(), item.getCode(), item.getAddress())) {
 						continue;
@@ -357,8 +370,10 @@ public class ExposureDataServiceImpl implements ExposureDataService {
 					Map<String, Object> row = new HashMap<>();
 					row.put("id", item.getId());
 					row.put("name", item.getName());
+					row.put("exposureType", typeEnum.getCode());
 					row.put("hazardCode", item.getCode());
 					row.put("division", item.getAddress());
+					row.put("regionCode", item.getRegionCode());
 					row.put("manager", item.getCompany());
 					row.put("area", item.getSeaArea());
 					row.put("areaKm2", item.getSeaArea());

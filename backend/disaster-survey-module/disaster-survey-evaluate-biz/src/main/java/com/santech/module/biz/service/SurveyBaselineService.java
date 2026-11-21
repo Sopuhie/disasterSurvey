@@ -12,9 +12,14 @@ public interface SurveyBaselineService {
 
 	ExecuteResult<Map<String, Object>> getBySceneId(String sceneId);
 
+	ExecuteResult<Map<String, Object>> getByEventId(String eventId);
+
 	ExecuteResult<Map<String, Object>> getLatest();
 
 	ExecuteResult<Map<String, Object>> save(Map<String, Object> payload, String operator);
+
+	/** 确认锁定：DRAFT -> CONFIRMED */
+	ExecuteResult<Map<String, Object>> confirm(String eventId, String operator);
 
 	ExecuteResult<List<Map<String, Object>>> list(String keyword);
 }

@@ -70,13 +70,13 @@
 		{
 			name: '灾情调查',
 			icon: 'disasterSurvey',
-			path: '/disasterSurvey',
+			path: '/survey',
 			children: []
 		},
 		{
 			name: '灾害评估',
 			icon: 'disasterAssessment',
-			path: '/disasterAssessment',
+			path: '/assessment/storm-surge',
 			children: []
 		},
 		{

@@ -32,6 +32,26 @@ public class HazardDossierDao extends BaseDao {
 		return queryObject(BizHazardDossierModel.class, "ID=:id", params);
 	}
 
+	public List<BizHazardDossierModel> listByEventId(String eventId) throws Exception {
+		Map<String, Object> params = new HashMap<>();
+		params.put("eventId", eventId);
+		return queryObjects(BizHazardDossierModel.class,
+				"EVENT_ID=:eventId order by ZHGXSJ desc, CJSJ desc", params);
+	}
+
+	public List<BizHazardDossierModel> listByEventIdAndExposureType(String eventId, String exposureType)
+			throws Exception {
+		Map<String, Object> params = new HashMap<>();
+		params.put("eventId", eventId);
+		StringBuilder where = new StringBuilder("EVENT_ID=:eventId");
+		if (StringUtil.isNotEmpty(exposureType)) {
+			where.append(" and EXPOSURE_TYPE=:exposureType");
+			params.put("exposureType", exposureType);
+		}
+		where.append(" order by ZHGXSJ desc, CJSJ desc");
+		return queryObjects(BizHazardDossierModel.class, where.toString(), params);
+	}
+
 	public List<BizHazardDossierModel> listArchived(String keyword) throws Exception {
 		StringBuilder where = new StringBuilder("ARCHIVE_STATUS='已归档'");
 		Map<String, Object> params = new HashMap<>();

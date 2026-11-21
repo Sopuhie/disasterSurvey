@@ -47,15 +47,16 @@ public class ExposureDataController {
 	  * @return (接口的执行情况及符合条件的记录信息)
 	  */
 	 @GetMapping("/tree")
-	 @ApiOperation(value = "根据承灾体类型查询承灾体树结构信息接口", notes = "{字段说明【\n" +
-			 "exposureType(承灾体类型，如Dike岸堤、Fishery渔港、CultureArea海水养殖区、TouristArea滨海旅游区，必传)\n" +
-	         "】")
+	 @ApiOperation(value = "根据承灾体类型查询承灾体树结构信息接口", notes = "exposureType 优先使用 ExposureTypeEnum："
+			 + "SEAWALL / FISHING_PORT / MARICULTURE / TOURIST_AREA；"
+			 + "兼容旧值 Dike/Fishery/CultureArea/TouristArea 与 seawall/fishing/mariculture/tourist")
 	 public ExecuteResult<List<ExposureTreeVo>> queryExposureTreeInfos(@RequestParam(value = "exposureType") String exposureType){
 		 return exposureDataService.queryExposureTreeInfos(exposureType);
 	 }
 
 	 @GetMapping("/list")
-	 @ApiOperation(value = "承灾体列表（字段对齐前端台账，无数据时前端回落 MOCK）", notes = "exposureType: Dike/Fishery/CultureArea/TouristArea 或 seawall/fishing/mariculture/tourist")
+	 @ApiOperation(value = "承灾体列表（字段对齐前端台账）", notes = "exposureType 优先使用 ExposureTypeEnum："
+			 + "SEAWALL / FISHING_PORT / MARICULTURE / TOURIST_AREA；兼容旧别名")
 	 public ExecuteResult<List<Map<String, Object>>> queryExposureList(
 			 @RequestParam(value = "exposureType") String exposureType,
 			 @RequestParam(value = "keyword", required = false) String keyword) {

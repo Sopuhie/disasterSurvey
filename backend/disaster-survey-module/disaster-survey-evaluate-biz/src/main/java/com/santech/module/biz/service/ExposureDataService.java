@@ -23,7 +23,7 @@ public interface ExposureDataService {
 
 	/**
 	 * 列表查询（字段对齐前端 surveyBase 承灾体展示）
-	 * @param exposureType Dike / Fishery / CultureArea / TouristArea
+	 * @param exposureType 优先 ExposureTypeEnum：SEAWALL/FISHING_PORT/MARICULTURE/TOURIST_AREA；兼容旧别名
 	 */
 	ExecuteResult<List<Map<String, Object>>> queryExposureList(String exposureType, String keyword);
 }

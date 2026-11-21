@@ -20,13 +20,15 @@ import {
 } from '@/views/survey/utils/overlayEngine.js'
 import { buildProfile, hazardDossierStore } from '@/views/survey/mock/hazardDossier.js'
 import { withMockFallback, isNonEmptyList } from '@/api/withMockFallback.js'
+import { isMockEnabled, toExposureLegacyId, toExposureType } from '@/constants/disasterEnums.js'
 import {
 	remoteDossierDownload,
 	remoteDossierGet,
 	remoteDossierListArchived,
 	remoteDossierRemoveItem,
 	remoteDossierSave,
-	remoteDossierUpload
+	remoteDossierUpload,
+	remoteExposureList
 } from '@/api/bizRemote.js'
 import {
 	TARGET_ENTITY_MAP,
@@ -34,34 +36,49 @@ import {
 	remoteComputeOverlay,
 	remoteSurveyTaskBuild
 } from '@/api/evaluateRemote.js'
+import {
+	listSurveyDossiers,
+	queryBaseExposures,
+	queryRegionPopulation,
+	saveSurveyDossier
+} from '@/api/survey/pipeline.js'
 import { findLatestSurveyResult } from '@/api/taskResultHydrate.js'
 import { km2ToWanMu, wanMuToKm2 } from '@/shared/metricUnits.js'
 import { buildAreaTree } from '@/utils/areaData.js'
+import { loadLocalRsManifest } from '@/utils/localRsImages.js'
 
 const isTaskId = d => typeof d === 'string' && d.length > 0
 
-/** 步骤 UI 结果落库到调查任务（liteMode）；失败静默 */
+/** 步骤 UI 结果落库到调查任务（liteMode）；失败不影响主流程 */
 const persistSurveyLiteTask = async ({ name, targetId, sceneId, resultData }) => {
-	const { data } = await withMockFallback(
-		() =>
-			remoteSurveyTaskBuild({
-				name,
-				targetEntity: TARGET_ENTITY_MAP[targetId] || targetId || 'Pop',
-				sceneId: sceneId || '',
-				liteMode: true,
-				resultData
-			}),
-		() => null,
-		isTaskId
-	)
-	return data || ''
+	try {
+		const { data } = await withMockFallback(
+			() =>
+				remoteSurveyTaskBuild({
+					name,
+					targetEntity: TARGET_ENTITY_MAP[targetId] || targetId || 'Pop',
+					sceneId: sceneId || '',
+					liteMode: true,
+					resultData
+				}),
+			() => null,
+			isTaskId,
+			{ silent: true }
+		)
+		return data || ''
+	} catch (e) {
+		return ''
+	}
 }
 
-/** 用县域台账推算识别 KPI（真数据优先；空则 mockIdentifyMeta） */
+/** 用县域台账推算识别 KPI；mock=false 时禁止回落演示数据 */
 const buildIdentifyMetaFromCounties = async (scene, district) => {
 	const ratio = scene?.inundationRatio || 0.45
 	let counties = await getCounties()
 	if (!isNonEmptyList(counties)) {
+		if (!isMockEnabled()) {
+			throw new Error('无法获取行政区划底数，请检查 /api/v1/survey/base/region-population')
+		}
 		const areaKm2 = Number((mockIdentifyMeta.areaKm2 * (0.85 + ratio)).toFixed(2))
 		const rows = (mockIdentifyMeta.counties || []).map(item => {
 			const a = Number((item.areaKm2 * (0.85 + ratio)).toFixed(2))
@@ -183,15 +200,98 @@ const HAZARD_TYPE_IDS = ['seawall', 'fishing', 'mariculture', 'tourist']
 
 const ready = () => surveyBaseMockStore.ensureReady()
 
-/** 真接口优先，空/失败回落 MOCK */
+/** 仅 Mock 模式可走运维万能表；业务主路径禁止 */
 const listType = (type, opts) => baseApi.listType(type, opts)
 
-const getCounties = async () => listType('county')
-const getCities = async () => listType('city')
-const getTowns = async () => listType('town')
-const getHazardsByType = async typeId => listType(typeId)
-const getScenes = async () => listType('rsScene')
+/** 仅读本地种子（不请求 bizdata） */
+const listLocalOnly = async type => {
+	await surveyBaseMockStore.ensureReady()
+	return surveyBaseMockStore.list(type) || []
+}
+
+const getCounties = async () => {
+	try {
+		const data = await queryRegionPopulation({})
+		if (isNonEmptyList(data?.rows)) return data.rows
+		if (data?.primary) return [data.primary]
+	} catch (e) {
+		if (!isMockEnabled()) throw e
+	}
+	if (!isMockEnabled()) throw new Error('行政区划底数查询失败')
+	return listType('county')
+}
+
+const getCities = async () => {
+	if (!isMockEnabled()) {
+		const local = await listLocalOnly('city')
+		return local
+	}
+	return listType('city')
+}
+
+const getTowns = async () => {
+	if (!isMockEnabled()) {
+		return listLocalOnly('town')
+	}
+	return listType('town')
+}
+
+const normalizeHazardRows = (list, exposureType) =>
+	(list || []).map(item => ({
+		...item,
+		name: item.name || item.dangerName,
+		exposureType
+	}))
+
+const getHazardsByType = async (typeId, { regionName, keyword } = {}) => {
+	const exposureType = toExposureType(typeId) || typeId
+	try {
+		const data = await queryBaseExposures({
+			exposureType,
+			regionName: regionName || undefined,
+			keyword: keyword || undefined
+		})
+		const grouped = data?.exposures || {}
+		const list = grouped[exposureType] || grouped[String(exposureType)] || []
+		return normalizeHazardRows(list, exposureType)
+	} catch (e) {
+		if (!isMockEnabled()) {
+			try {
+				return normalizeHazardRows(await remoteExposureList(exposureType, keyword || ''), exposureType)
+			} catch (e2) {
+				throw new Error(e?.message || `承灾体台账查询失败（${typeId}）`)
+			}
+		}
+	}
+	return listType(toExposureLegacyId(typeId) || typeId)
+}
+
+const getScenes = async () => {
+	if (isMockEnabled()) {
+		const fromBiz = await listType('rsScene').catch(() => [])
+		if (isNonEmptyList(fromBiz)) return fromBiz
+	}
+	const manifest = await loadLocalRsManifest()
+	const items = (manifest?.items || []).map(item => ({
+		id: item.id,
+		name: item.name || item.id,
+		date: item.date || '',
+		regionHint: item.regionHint || item.region || '',
+		inundationRatio: Number(item.inundationRatio) || 0.45,
+		imageId: item.id,
+		sensor: item.sensor || '孔径雷达卫星'
+	}))
+	if (!items.length && !isMockEnabled()) {
+		throw new Error('未找到遥感场景（请检查 public/datas/images/manifest.json）')
+	}
+	return items
+}
+
 const getReportedByType = async (hazardType, targetName) => {
+	if (!isMockEnabled()) {
+		/* 速报对比以 pipeline compare-quick-report 为准；此处不再读万能表 */
+		return []
+	}
 	const list = await listType('reported')
 	return list
 		.filter(item => item.hazardType === hazardType)
@@ -408,28 +508,50 @@ export function surveyApi() {
 		queryDistrict: async ({ name, lon, lat }) => {
 			await ready()
 			await wait(280)
-			// 优先本地县界/市域真实范围，避免示意圆面
+			// Step1：优先 /api/v1/survey/base/region-population
+			let remotePrimary = null
+			try {
+				const data = await queryRegionPopulation({
+					regionName: name || undefined,
+					lon: Number.isFinite(Number(lon)) ? Number(lon) : undefined,
+					lat: Number.isFinite(Number(lat)) ? Number(lat) : undefined
+				})
+				remotePrimary = data?.primary || data?.rows?.[0] || null
+			} catch (e) {
+				if (!isMockEnabled() && !name && !(Number.isFinite(Number(lon)) && Number.isFinite(Number(lat)))) {
+					throw e
+				}
+			}
 			const admin = name
 				? await resolveAdminFeatureByName(name)
 				: await resolveAdminFeatureByCoord(Number(lon), Number(lat))
-			const ledger = name
-				? await findCountyByName(name)
-				: admin
-					? await findCountyByName(admin.name)
-					: nearestByCoord(await getCounties(), Number(lon), Number(lat))
-			if (!admin && !ledger) return null
+			const ledger =
+				remotePrimary ||
+				(name
+					? await findCountyByName(name)
+					: admin
+						? await findCountyByName(admin.name)
+						: nearestByCoord(await getCounties().catch(() => []), Number(lon), Number(lat)))
+			if (!admin && !ledger) {
+				if (!isMockEnabled()) throw new Error('未查询到行政区划')
+				return null
+			}
 			const feature = admin?.feature || (ledger ? makeDistrictFeature(ledger) : null)
-			if (!feature) return null
+			if (!feature) {
+				if (!isMockEnabled() && !ledger) throw new Error('行政区划无空间范围')
+				if (!feature) return null
+			}
 			return {
 				...(ledger || {}),
 				...(admin || {}),
-				name: admin?.name || ledger?.name,
+				name: admin?.name || ledger?.name || remotePrimary?.regionName,
 				city: admin?.city || ledger?.city,
-				population: ledger?.population ?? admin?.population,
-				density: ledger?.density ?? admin?.density,
-				statArea: ledger?.statArea ?? admin?.statArea,
+				population: ledger?.population ?? admin?.population ?? remotePrimary?.population,
+				density: ledger?.density ?? admin?.density ?? remotePrimary?.density,
+				statArea: ledger?.statArea ?? admin?.statArea ?? remotePrimary?.statArea,
 				lon: admin?.lon ?? ledger?.lon,
 				lat: admin?.lat ?? ledger?.lat,
+				regionCode: ledger?.regionCode || remotePrimary?.regionCode || ledger?.code,
 				feature
 			}
 		},
@@ -460,8 +582,9 @@ export function surveyApi() {
 			const text = (keyword || '').trim()
 			const districtName = (district || '').trim()
 			const townName = (town || '').trim()
-			// 列表仅返回属性；空间要素在定位时按需解析，避免首屏挂载上千条几何
-			return (await getHazardsByType(typeId)).filter(item => {
+			// Step1：优先 /api/v1/survey/base/exposures
+			const list = await getHazardsByType(typeId, { regionName: districtName, keyword: text })
+			return list.filter(item => {
 				if (districtName && !hazardMatchesDistrict(item, districtName)) return false
 				if (townName && !hazardMatchesTown(item, townName)) return false
 				if (!text) return true
@@ -531,29 +654,34 @@ export function surveyApi() {
 				}
 			}
 
-			const { data: computed } = await withMockFallback(
-				() =>
-					remoteComputeIdentify({
-						sceneId: sid,
-						sceneName: scene.name,
-						sceneDate: scene.date,
-						regionHint: scene.regionHint,
-						inundationRatio: scene.inundationRatio || 0.45,
-						districtName: district?.name || '',
-						city: district?.city || '',
-						persist: true
-					}),
-				() => null,
-				d => !!d?.meta
-			)
-			if (computed?.meta) {
-				return {
-					scene,
-					feature,
-					meta: computed.meta,
-					taskId: computed.taskId || '',
-					source: 'compute'
+			try {
+				const { data: computed } = await withMockFallback(
+					() =>
+						remoteComputeIdentify({
+							sceneId: sid,
+							sceneName: scene.name,
+							sceneDate: scene.date,
+							regionHint: scene.regionHint,
+							inundationRatio: scene.inundationRatio || 0.45,
+							districtName: district?.name || '',
+							city: district?.city || '',
+							persist: true
+						}),
+					() => null,
+					d => !!d?.meta,
+					{ silent: true }
+				)
+				if (computed?.meta) {
+					return {
+						scene,
+						feature,
+						meta: computed.meta,
+						taskId: computed.taskId || '',
+						source: 'compute'
+					}
 				}
+			} catch (e) {
+				if (!isMockEnabled() && !feature) throw e
 			}
 
 			let meta = null
@@ -574,7 +702,12 @@ export function surveyApi() {
 			} catch (err) {
 				meta = null
 			}
-			if (!meta) meta = await buildIdentifyMetaFromCounties(scene, district)
+			if (!meta) {
+				meta = await buildIdentifyMetaFromCounties(scene, district)
+			}
+			if (!meta && !isMockEnabled()) {
+				throw new Error('受灾范围识别失败：无有效遥感面或行政区底数')
+			}
 			const taskId = await persistSurveyLiteTask({
 				name: `受灾范围识别-${scene.name || sid || 'default'}`,
 				targetId: 'population',
@@ -669,30 +802,35 @@ export function surveyApi() {
 				}
 			}
 
-			const { data: computed } = await withMockFallback(
-				() =>
-					remoteComputeOverlay({
-						sceneId,
-						targetId,
-						targetEntity: TARGET_ENTITY_MAP[targetId] || targetId,
-						hazardName: hazardName || '',
-						persist: true
-					}),
-				() => null,
-				d => Array.isArray(d?.rows) && d?.totals
-			)
-			if (computed?.rows && computed?.totals) {
-				const features = HAZARD_TYPE_IDS.includes(targetId)
-					? await buildHazardOverlayFeatures(targetId, computed.rows)
-					: makeOverlayFeatures(targetId)
-				return {
-					target: targetId,
-					rows: computed.rows,
-					totals: computed.totals,
-					features,
-					taskId: computed.taskId || '',
-					source: 'compute'
+			try {
+				const { data: computed } = await withMockFallback(
+					() =>
+						remoteComputeOverlay({
+							sceneId,
+							targetId,
+							targetEntity: TARGET_ENTITY_MAP[targetId] || targetId,
+							hazardName: hazardName || '',
+							persist: true
+						}),
+					() => null,
+					d => Array.isArray(d?.rows) && d?.totals,
+					{ silent: true }
+				)
+				if (computed?.rows && computed?.totals) {
+					const features = HAZARD_TYPE_IDS.includes(targetId)
+						? await buildHazardOverlayFeatures(targetId, computed.rows)
+						: makeOverlayFeatures(targetId)
+					return {
+						target: targetId,
+						rows: computed.rows,
+						totals: computed.totals,
+						features,
+						taskId: computed.taskId || '',
+						source: 'compute'
+					}
 				}
+			} catch (e) {
+				/* 继续空间/台账叠置 */
 			}
 
 			let pack = null
@@ -724,9 +862,12 @@ export function surveyApi() {
 					const meta = await buildIdentifyMetaFromCounties(scene, null)
 					pack = buildPopulationOverlayFromMeta(meta)
 				}
-				if (!pack?.rows?.length && mockOverlayResults.population) {
+				if (!pack?.rows?.length && isMockEnabled() && mockOverlayResults.population) {
 					pack = mockOverlayResults.population
 				}
+			}
+			if ((!pack || !pack.rows?.length) && !isMockEnabled()) {
+				throw new Error(`叠置分析无结果（${targetId}），请确认受灾范围与承灾体底数`)
 			}
 			pack = pack || { rows: [], totals: { count: 0, areaKm2: 0 } }
 			const features = HAZARD_TYPE_IDS.includes(targetId)
@@ -750,7 +891,7 @@ export function surveyApi() {
 				target: targetId,
 				features,
 				taskId,
-				source: taskId ? 'ledger+persisted' : 'mock'
+				source: taskId ? 'ledger+persisted' : pack.source || 'spatial'
 			}
 		},
 		getReportedLoss: async ({ hazardType, targetName }) => {
@@ -762,61 +903,92 @@ export function surveyApi() {
 			}
 			return matched
 		},
-		/** 调查对象详情台账（明细 / 现场资料 / 附件 / 核对归档）——真接口优先，空则 MOCK */
-		getHazardDossier: async ({ typeId, hazard, overlayNote = '', compareNote = '' }) => {
+		/** 调查对象详情台账：优先 /api/v1/survey/.../dossiers */
+		getHazardDossier: async ({ typeId, hazard, overlayNote = '', compareNote = '', eventId = '' } = {}) => {
 			await ready()
 			await wait(120)
 			const name = hazard?.name || hazard?.dangerName
 			if (!typeId || !name) throw new Error('请先选择调查对象')
+			const exposureType = toExposureType(typeId) || typeId
 			const row =
-				(await getHazardsByType(typeId)).find(item => item.name === name || item.dangerName === name) || hazard
+				(await getHazardsByType(typeId).catch(() => [])).find(
+					item => item.name === name || item.dangerName === name
+				) || hazard
+
+			if (eventId) {
+				try {
+					const list = await listSurveyDossiers(eventId, exposureType)
+					const hit = (list || []).find(
+						item =>
+							item.hazardName === name ||
+							item.exposureName === name ||
+							item.name === name ||
+							item.exposureId === hazard?.id
+					)
+					if (hit) {
+						const profile = { ...buildProfile(row), ...(hit.profile || {}) }
+						return hazardDossierStore.save({
+							...hit,
+							hazardType: typeId,
+							hazardName: name,
+							exposureType,
+							profile,
+							surveySummary: {
+								...(hit.surveySummary || {}),
+								overlayNote: overlayNote || hit.surveySummary?.overlayNote || '',
+								compareNote: compareNote || hit.surveySummary?.compareNote || ''
+							},
+							materials: Array.isArray(hit.materials) ? hit.materials : [],
+							attachments: Array.isArray(hit.attachments) ? hit.attachments : []
+						})
+					}
+					const created = await saveSurveyDossier(eventId, {
+						exposureType,
+						exposureId: hazard?.id || '',
+						hazardName: name,
+						exposureName: name,
+						profile: buildProfile(row),
+						surveySummary: { overlayNote, compareNote }
+					})
+					if (created) {
+						return hazardDossierStore.save({
+							...created,
+							hazardType: typeId,
+							hazardName: name,
+							exposureType
+						})
+					}
+				} catch (e) {
+					if (!isMockEnabled()) throw e
+				}
+			}
+
+			if (!isMockEnabled()) {
+				throw new Error('详情台账不存在：请传入 eventId 并确认后端 dossiers 接口')
+			}
 
 			const { data: remote } = await withMockFallback(
 				() => remoteDossierGet(typeId, name),
 				() => null,
 				d => !!d && typeof d === 'object'
 			)
-
 			if (remote) {
 				const profile = { ...(remote.profile || {}), ...buildProfile(row) }
-				const merged = hazardDossierStore.save({
+				return hazardDossierStore.save({
 					...remote,
 					hazardType: typeId,
 					hazardName: name,
 					profile,
 					surveySummary: {
 						...(remote.surveySummary || {}),
-						monitorValue: profile.monitorValue ?? remote.surveySummary?.monitorValue,
-						planValue: profile.planValue ?? remote.surveySummary?.planValue,
-						disasterLevel: profile.disasterLevel ?? remote.surveySummary?.disasterLevel,
-						disasterLevelLabel: profile.disasterLevelLabel ?? remote.surveySummary?.disasterLevelLabel,
-						affectedPopulation: profile.affectedPopulation ?? remote.surveySummary?.affectedPopulation,
-						economicLoss: profile.economicLoss ?? remote.surveySummary?.economicLoss,
 						overlayNote: overlayNote || remote.surveySummary?.overlayNote || '',
 						compareNote: compareNote || remote.surveySummary?.compareNote || ''
 					},
 					materials: Array.isArray(remote.materials) ? remote.materials : [],
 					attachments: Array.isArray(remote.attachments) ? remote.attachments : []
 				})
-				try {
-					await remoteDossierSave(merged)
-				} catch (e) {
-					/* 本地已保存，远端同步失败不影响展示 */
-				}
-				return merged
 			}
-
-			const mockDossier = hazardDossierStore.ensure(typeId, row, { overlayNote, compareNote })
-			try {
-				const saved = await remoteDossierSave(mockDossier)
-				if (saved) {
-					hazardDossierStore.save(saved)
-					return saved
-				}
-			} catch (e) {
-				/* 仍返回 MOCK */
-			}
-			return mockDossier
+			return hazardDossierStore.ensure(typeId, row, { overlayNote, compareNote })
 		},
 		queryHazardDossierMaterials: async ({ typeId, hazardName, keyword = '', category = '' }) => {
 			await ready()
@@ -879,8 +1051,9 @@ export function surveyApi() {
 					return saved
 				}
 			} catch (e) {
-				/* mock */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('现场资料核对状态保存失败')
 			return next
 		},
 		toggleAttachmentVerified: async ({ typeId, hazardName, attachmentId, verified }) => {
@@ -907,8 +1080,9 @@ export function surveyApi() {
 					return saved
 				}
 			} catch (e) {
-				/* mock */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('附件核对状态保存失败')
 			return next
 		},
 		verifyHazardDossier: async ({ typeId, hazardName, verifyStatus, verifyRemark, verifiedBy }) => {
@@ -937,8 +1111,9 @@ export function surveyApi() {
 					return saved
 				}
 			} catch (e) {
-				/* mock */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('台账核对结果保存失败')
 			return next
 		},
 		archiveHazardDossier: async ({ typeId, hazardName, archiveRemark, archivedBy }) => {
@@ -974,8 +1149,9 @@ export function surveyApi() {
 					return saved
 				}
 			} catch (e) {
-				/* mock */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('台账归档失败')
 			return next
 		},
 		listArchivedDossiers: async ({ keyword = '' } = {}) => {
@@ -1011,8 +1187,9 @@ export function surveyApi() {
 					return remote.dossier
 				}
 			} catch (e) {
-				/* 回落本地 */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('文件上传失败')
 			const local = await hazardDossierStore.uploadLocal({
 				typeId,
 				hazardName,
@@ -1028,7 +1205,7 @@ export function surveyApi() {
 					return saved
 				}
 			} catch (e) {
-				/* 仅本地 */
+				/* Mock 模式仅本地 */
 			}
 			return local
 		},

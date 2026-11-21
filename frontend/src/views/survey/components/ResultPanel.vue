@@ -237,7 +237,7 @@
 				<ZTableCom
 					v-else
 					:tableHeaders="compareHeaders"
-					:tableData="surveyStore.compareRows"
+					:tableData="compareTableData"
 					:tableHeight="420"
 					stripe
 					:headerCellStyle="tableHeadStyle" />
@@ -431,14 +431,83 @@
 		]
 	})
 
-	const compareHeaders = [
-		{ label: '数据来源', prop: 'source' },
-		{ label: SURVEY_LABELS.affectedPopulation, prop: 'population' },
-		{ label: SURVEY_LABELS.areaKm2, prop: 'area' },
-		{ label: SURVEY_LABELS.economicLoss, prop: 'loss' }
-	]
+	const compareHeaders = computed(() => {
+		if (surveyStore.compareMetricRows?.length) {
+			return [
+				{ label: '指标', prop: 'metric' },
+				{ label: '单位', prop: 'unit', width: 70 },
+				{ label: '遥感解译', prop: 'rsValue' },
+				{ label: '灾情速报', prop: 'quickValue' },
+				{ label: '差值', prop: 'diff' },
+				{ label: '确认值', prop: 'confirmedValue' }
+			]
+		}
+		return [
+			{ label: '数据来源', prop: 'source' },
+			{ label: SURVEY_LABELS.affectedPopulation, prop: 'population' },
+			{ label: SURVEY_LABELS.areaKm2, prop: 'area' },
+			{ label: SURVEY_LABELS.economicLoss, prop: 'loss' }
+		]
+	})
+
+	const compareTableData = computed(() =>
+		surveyStore.compareMetricRows?.length ? surveyStore.compareMetricRows : surveyStore.compareRows
+	)
 
 	const chartOption = computed(() => {
+		const remoteChart = surveyStore.compareChart
+		if (remoteChart?.categories?.length) {
+			const categories = remoteChart.categories
+			const needRotate = categories.some(item => String(item || '').length > 6)
+			return {
+				tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true },
+				legend: {
+					bottom: 4,
+					left: 'center',
+					icon: 'roundRect',
+					itemWidth: 10,
+					itemHeight: 8,
+					itemGap: 18,
+					textStyle: { fontSize: 11, color: '#5c6b7a' }
+				},
+				grid: { top: 28, left: 8, right: 8, bottom: 36, containLabel: true },
+				xAxis: {
+					type: 'category',
+					data: categories,
+					axisTick: { alignWithLabel: true, show: false },
+					axisLine: { lineStyle: { color: '#d9e0ea' } },
+					axisLabel: {
+						color: '#5c6b7a',
+						fontSize: 11,
+						interval: 0,
+						hideOverlap: true,
+						rotate: needRotate ? 25 : 0
+					}
+				},
+				yAxis: {
+					type: 'value',
+					splitLine: { lineStyle: { color: '#eef2f7' } },
+					axisLabel: { color: '#8a97a8', fontSize: 11 }
+				},
+				series: [
+					{
+						name: '遥感解译',
+						type: 'bar',
+						barMaxWidth: 18,
+						barGap: '35%',
+						data: remoteChart.rsSeries || [],
+						itemStyle: { color: '#1677FF', borderRadius: [3, 3, 0, 0] }
+					},
+					{
+						name: '灾情速报',
+						type: 'bar',
+						barMaxWidth: 18,
+						data: remoteChart.quickSeries || [],
+						itemStyle: { color: '#FA8C16', borderRadius: [3, 3, 0, 0] }
+					}
+				]
+			}
+		}
 		const rows = surveyStore.compareRows || []
 		const categories = rows.map(item => item.source)
 		const needRotate = categories.some(item => String(item || '').length > 6)

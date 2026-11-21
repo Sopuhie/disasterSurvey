@@ -10,7 +10,12 @@ import {
 } from '@/views/assessment/utils/assessmentEngine.js'
 import { reportArchiveStore } from '@/views/assessment/mock/reportArchive.js'
 import { withMockFallback, isNonEmptyList } from '@/api/withMockFallback.js'
-import { remoteArchiveReport, remoteGetArchive, remoteListArchives } from '@/api/bizRemote.js'
+import { isMockEnabled } from '@/constants/disasterEnums.js'
+import {
+	generateAssessmentReport,
+	getAssessmentReport,
+	listAssessmentReports
+} from '@/api/assessment/pipeline.js'
 import {
 	DISASTER_TYPE_MAP,
 	remoteComputeLoss,
@@ -25,7 +30,25 @@ const isTaskId = d => typeof d === 'string' && d.length > 0
 
 const wait = (ms = 400) => new Promise(resolve => setTimeout(resolve, ms))
 const baseApi = surveyBaseApi()
-const listType = (type, opts) => baseApi.listType(type, opts)
+/** 评估运行时：mock=false 禁止走 bizdata 万能表，仅本地种子或抛错 */
+const listType = async (type, opts = {}) => {
+	if (isMockEnabled()) return baseApi.listType(type, opts)
+	await surveyBaseMockStore.ensureReady()
+	const { keyword = '', extraType = '' } = opts
+	let rows = surveyBaseMockStore.list(type) || []
+	if (extraType) {
+		rows = rows.filter(
+			item => item.type === extraType || item.kind === extraType || item.extraType === extraType
+		)
+	}
+	if (keyword) {
+		const text = String(keyword)
+		rows = rows.filter(item =>
+			[item.name, item.code, item.county, item.city, item.dangerName].some(v => String(v || '').includes(text))
+		)
+	}
+	return rows
+}
 
 const toLandMap = row => ({
 	耕地: Number(row.landFarm) || 0,
@@ -58,7 +81,7 @@ const normalizeDamageRow = item => {
 
 /**
  * 灾害评估接口适配器。
- * 真接口优先；无数据/失败时回落 MOCK（含运维 localStorage 与系统 JSON）。
+ * 真接口优先；仅 VITE_USE_MOCK=true 时允许回落演示数据。
  */
 export function assessmentApi() {
 	return {
@@ -84,8 +107,9 @@ export function assessmentApi() {
 				const saved = await baseApi.create('assessIntegrate', row)
 				if (saved?.data) return saved.data
 			} catch (e) {
-				/* mock below */
+				if (!isMockEnabled()) throw e
 			}
+			if (!isMockEnabled()) throw new Error('速报整合保存失败')
 			const exists = surveyBaseMockStore.getById('assessIntegrate', row.id)
 			if (exists) {
 				return surveyBaseMockStore.update('assessIntegrate', { ...exists, ...row })
@@ -110,6 +134,9 @@ export function assessmentApi() {
 			const hit =
 				list.find(item => item.name === name || name?.includes(item.name) || item.name.includes(name || '')) || null
 			if (!hit) {
+				if (!isMockEnabled()) {
+					throw new Error(`未找到县域经济底数：${name || '-'}`)
+				}
 				return {
 					...defaultEconomy,
 					name: name || defaultEconomy.name
@@ -244,32 +271,19 @@ export function assessmentApi() {
 				}
 			}
 		},
+		/** @deprecated 业务归档请走 generateAssessmentReport(eventId)；此处仅 Mock 兜底 */
 		archiveAssessmentReport: async (report, meta = {}) => {
 			await wait(120)
 			if (!report) throw new Error('无可归档的评估报告')
-			const payload = {
-				...meta,
-				title: report.title || meta.title,
-				typeId: report.typeId || meta.typeId,
-				typeLabel: report.typeLabel || meta.typeLabel,
-				district: report.district || meta.district,
-				sceneName: report.sceneName || meta.sceneName,
-				grade: report.grade,
-				total: report.total,
-				snapshot: report,
-				reportNo: meta.reportNo
+			if (!isMockEnabled()) {
+				throw new Error('请通过事件报告接口归档：POST /api/v1/assessment/events/{eventId}/reports/generate')
 			}
-			const { data } = await withMockFallback(
-				() => remoteArchiveReport(payload),
-				() => reportArchiveStore.save(report, meta),
-				d => !!d
-			)
-			return data
+			return reportArchiveStore.save(report, meta)
 		},
-		listArchivedReports: async () => {
+		listArchivedReports: async (params = {}) => {
 			await wait(80)
 			const { data } = await withMockFallback(
-				() => remoteListArchives(),
+				() => listAssessmentReports(params),
 				() => reportArchiveStore.list(),
 				isNonEmptyList
 			)
@@ -278,11 +292,15 @@ export function assessmentApi() {
 		getArchivedReport: async id => {
 			await wait(60)
 			const { data } = await withMockFallback(
-				() => remoteGetArchive(id),
+				() => getAssessmentReport(id),
 				() => reportArchiveStore.getById(id),
 				d => !!d
 			)
 			return data
+		},
+		generateEventReport: async (eventId, body = {}) => {
+			if (!eventId) throw new Error('缺少灾害事件 ID')
+			return generateAssessmentReport(eventId, body)
 		},
 
 		/** 回填最近一次损失测算（服务端 resultData.kind=loss） */

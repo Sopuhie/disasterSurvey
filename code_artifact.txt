@@ -1,0 +1,270 @@
+================================================================================
+海洋灾害灾情调查与灾害评估模块 —— 重构执行说明书（Cursor AI 专用）
+================================================================================
+
+【给 Cursor 的阅读与执行总则】
+1. 本文档是重构 `灾情调查 (Disaster Survey)` 与 `灾害评估 (Disaster Assessment)` 两个业务模块的唯一权威规范。
+2. 严禁修改 `disaster-survey-authentication-biz`（权限认证）、`disaster-survey-resource-biz`（资源目录）、`disaster-survey-gis-biz`（底层GIS工具）的原有稳定逻辑，除非需要新增无侵入的通用查询方法。
+3. 必须严格按照文档末尾的【六、分阶段执行计划】分步实施。每完成一个阶段，需保证项目可正常编译通过，不要一次性大面积删除旧接口导致前端完全不可用。
+4. 执行前请先扫描当前工作区的前端目录结构（如 `frontend/src` 下的 `views`、`api`、`store`、`router`），结合本文档给出的后端确切路径进行双向对齐。
+
+================================================================================
+一、 重构目标与核心业务边界
+================================================================================
+
+1.1 现状核心问题（重构必须消除的病灶）
+- 双轨并存：旧版异步任务轨（`DisasterSurveyTaskManagerController`、`EvaluateTaskManagerController`、`ExecuteEvaluateScheduleTask`）与新版前端驱动补丁轨（`StepComputeController`、`BizFrontendDataController`）混杂；定时器注解已被注释停用且残留其他项目注释（如“水质插值评价任务”）。
+- 万能表滥用：`T_BIZ_FRONTEND_DATA`（`BizFrontendDataModel`）把各类业务结果直接存成无结构 JSON，导致业务不可追溯。
+- 命名分裂：同一承灾体存在三套命名（后端 Entity：`Dike/Fishery/CultureArea/TouristArea`；前端：`seawall/fishing/mariculture/tourist`；业务配置：中文名称）；灾害类型存在冗余映射（如 `storm/economic`、`wind/seabreeze`、`wave/seawave`）。
+- 上下游断层：灾情调查产出未通过统一主线（事件ID + 基线版本）严谨传递给灾害评估。
+- Mock 污染：前端在接口失败或无数据时静默回落到本地 Mock 数据，掩盖真实接口问题。
+
+1.2 重构后的业务定位与主线
+- 顶层主线：引入【灾害事件 (`DisasterEvent`, `event_id`)】贯穿全链路：
+  `灾害事件 (Event)` -> `灾情调查 (产出已确认的调查基线 Baseline)` -> `灾害评估 (风暴潮/海风/海浪)` -> `综合评估报告归档 (Report)`
+- 灾情调查模块（客观事实层：摸底数、核真伪）：
+  1) 基础底数查询（行政区划、人口密度、4类承灾体）
+  2) 遥感影像受灾范围识别（提取受灾面 Polygon）
+  3) 多维空间叠置分析与影像导出（受灾人口、乡镇受灾面积、4类受灾承灾体清单及影像导出）
+  4) 遥感分析结果与灾情速报上报数据对比核查 -> 固化为《调查基线》
+- 灾害评估模块（研判决策层：析机理、算损失、出报告）：
+  1) 风暴潮评估：受灾信息标准化整合 -> 灾后经济损失评估 -> 风暴潮灾后综合评估
+  2) 海风评估：SAR海风破坏性分析 -> 卫星海风行为分析 -> 海风综合评估
+  3) 海浪评估：SAR海浪破坏性分析 -> 卫星海浪行为分析 -> 海浪灾后综合评估
+  4) 统一评估报告生成与归档管理
+
+================================================================================
+二、 全局统一领域字典与枚举规范（前后端强一致）
+================================================================================
+
+请在后端 `disaster-survey-core` 中新建枚举包 `com.santech.core.framework.entity.enums.biz`，并在前端新建统一常量文件（如 `src/constants/disasterEnums.js` 或 `.ts`），前后端严格使用以下编码：
+
+2.1 灾害类型枚举 (`DisasterTypeEnum`)
+- `STORM_SURGE` : 风暴潮（替代旧的 storm / economic 等混用）
+- `SEA_WIND`    : 海风（替代旧的 wind / seabreeze 等混用）
+- `SEA_WAVE`    : 海浪（替代旧的 wave / seawave 等混用）
+
+2.2 承灾体类型枚举 (`ExposureTypeEnum`)
+- `SEAWALL`      : 海堤 / 海岸防护工程（对应实体 `BaseDikeModel`）
+- `FISHING_PORT` : 渔港（对应实体 `BaseFisheryModel`）
+- `MARICULTURE`  : 海水养殖区（对应实体 `BaseCultureAreaModel`）
+- `TOURIST_AREA` : 滨海旅游区（对应实体 `BaseTouristAreaModel`）
+
+2.3 评估子项枚举 (`AssessmentSubTypeEnum`)
+- 风暴潮：`STORM_INFO_INTEGRATION`（信息整合）、`STORM_ECONOMIC_LOSS`（经济损失）、`STORM_COMPREHENSIVE`（综合评估）
+- 海风：`WIND_DAMAGE_ANALYSIS`（破坏性分析）、`WIND_BEHAVIOR_ANALYSIS`（行为分析）、`WIND_COMPREHENSIVE`（综合评估）
+- 海浪：`WAVE_DAMAGE_ANALYSIS`（破坏性分析）、`WAVE_BEHAVIOR_ANALYSIS`（行为分析）、`WAVE_COMPREHENSIVE`（综合评估）
+
+2.4 调查基线状态枚举 (`BaselineStatusEnum`)
+- `DRAFT`     : 草稿/调查中（可修改、重算）
+- `CONFIRMED` : 已核查确认（只读锁定，可作为下游灾害评估的正式输入）
+- `ARCHIVED`  : 已归档
+
+2.5 异步计算任务状态枚举 (`ComputeTaskStatusEnum`)
+- `CREATED`   : 已创建
+- `RUNNING`   : 计算中
+- `SUCCEEDED` : 已完成
+- `FAILED`    : 失败
+
+================================================================================
+三、 数据模型与数据库表重构设计
+================================================================================
+
+涉及文件：
+- `backend/disaster-survey-module/disaster-survey-evaluate-biz/src/main/java/com/santech/module/biz/config/BizSchemaInitializer.java`
+- `backend/disaster-survey-admin/src/main/resources/sql/init_biz_frontend.sql`
+- `backend/disaster-survey-core/src/main/java/com/santech/core/framework/entity/model/` 下的业务 Model
+
+需要建立/升级以下 5 张核心结构化业务表（全部通过 `event_id` 关联）：
+
+3.1 灾害事件主表：`T_BIZ_DISASTER_EVENT`（新增）
+- `id` (PK, VARCHAR) : 事件唯一ID (`event_id`)
+- `event_code` (VARCHAR) : 事件编号
+- `event_name` (VARCHAR) : 灾害事件名称（如“2026年第X号台风风暴潮灾后调查”）
+- `disaster_types` (VARCHAR) : 涉及灾种（逗号分隔，取自 `DisasterTypeEnum`）
+- `region_code` (VARCHAR) : 沿海区县行政区划编码
+- `region_name` (VARCHAR) : 行政区划名称
+- `occur_time` (TIMESTAMP) : 灾害发生时间
+- `status` (VARCHAR) : 事件状态 (`ACTIVE` / `CLOSED`)
+- `create_time`, `update_time`, `create_by`
+
+3.2 灾情调查基线表：`T_BIZ_SURVEY_BASELINE`（重构升级现有 `BizSurveyBaselineModel`）
+- `id` (PK, VARCHAR) : 基线ID (`baseline_id`)
+- `event_id` (VARCHAR, NOT NULL) : 关联 `T_BIZ_DISASTER_EVENT.id`
+- `version_no` (INT) : 基线版本号
+- `status` (VARCHAR) : `DRAFT` / `CONFIRMED` / `ARCHIVED`
+- `rs_image_id` (VARCHAR) : 使用的灾后遥感影像资源ID
+- `affected_area_geojson` (TEXT/CLOB) : Step2 识别出的受灾范围矢量面
+- `affected_population` (DECIMAL/INT) : Step3 受灾人口预估
+- `town_area_stats_json` (TEXT/CLOB) : Step3 乡镇受灾面积预估列表
+- `exposure_overlay_json` (TEXT/CLOB) : Step3 4类受灾承灾体叠置清单（按 `ExposureTypeEnum` 分组）
+- `compare_check_json` (TEXT/CLOB) : Step4 遥感解译 vs 速报上报对比核查结果（差异项与核定值）
+- `confirmed_time`, `confirmed_by`, `create_time`, `update_time`
+
+3.3 承灾体现场核查档案表：`T_BIZ_HAZARD_DOSSIER`（规范现有 `BizHazardDossierModel`）
+- 补充/规范字段：`event_id`、`baseline_id`、`exposure_type`（严格使用 `ExposureTypeEnum`）、`exposure_id`、`rs_clip_image_url`（导出的承灾体遥感影像路径）、`field_attachments_json`（现场核查照片/附件）。
+
+3.4 灾害评估记录表：`T_BIZ_ASSESSMENT_RECORD`（新增，取代 `T_BIZ_FRONTEND_DATA` 的评估数据存储）
+- `id` (PK, VARCHAR) : 评估记录ID (`assessment_id`)
+- `event_id` (VARCHAR, NOT NULL) : 关联灾害事件
+- `baseline_id` (VARCHAR) : 关联已确认的调查基线（风暴潮评估强关联，风/浪评估可选关联）
+- `disaster_type` (VARCHAR, NOT NULL) : `STORM_SURGE` / `SEA_WIND` / `SEA_WAVE`
+- `sub_type` (VARCHAR, NOT NULL) : 取自 `AssessmentSubTypeEnum`
+- `region_code` (VARCHAR) : 评估区县编码
+- `input_params_json` (TEXT/CLOB) : 评估输入参数（如坐标、SAR影像ID、经济/土地底数快照、标准化速报数据）
+- `result_data_json` (TEXT/CLOB) : 结构化计算结果（经济损失明细、风/浪破坏等级、淹没/侵蚀估测、综合评分因子）
+- `compute_mode` (VARCHAR) : `SYNC`（同步推算） / `ASYNC`（外部模型异步计算）
+- `status` (VARCHAR) : 取自 `ComputeTaskStatusEnum`
+- `create_time`, `update_time`, `create_by`
+
+3.5 评估报告归档表：`T_BIZ_REPORT_ARCHIVE`（规范现有 `BizReportArchiveModel`）
+- 补充/规范字段：`event_id`、`assessment_id`、`disaster_type`、`report_title`、`report_file_path`、`report_format`（DOCX/PDF）、`summary_json`（报告核心结论摘要）、`create_time`。
+
+3.6 废弃表处理
+- `T_BIZ_FRONTEND_DATA`（`BizFrontendDataModel`）：停止向其写入任何新的调查/评估业务数据；待现有前端页面全部切换到新接口后，将其标记 `@Deprecated` 并清理。
+
+================================================================================
+四、 后端重构详细清单
+================================================================================
+
+涉及主模块：`backend/disaster-survey-module/disaster-survey-evaluate-biz`
+
+4.1 包结构清晰化（按业务子域重组）
+在 `com.santech.module.biz` 下按子域整理（或在 Controller/Service 内部清晰分包）：
+- `event/`      : 灾害事件管理（新增 `DisasterEventController` / `Service`）
+- `survey/`     : 灾情调查 4 步流水线（底数查询、遥感范围、叠置与影像导出、对比核查与基线管理、承灾体档案）
+- `assessment/` : 灾害评估（风暴潮、海风、海浪分轨服务 + 统一报告生成与归档）
+- `engine/`     : 计算引擎层（拆分同步规则计算与外部模型异步执行）
+
+4.2 现有类的处置策略（明确保留、重构或清理）
+1) `timer/ExecuteEvaluateScheduleTask.java`：
+   - 清理已被注释掉的定时任务死代码以及无关历史注释（如“水质插值评价任务”）。
+   - 若当前不需要后台定时轮询外部模型，则移除该定时类；若需保留异步模型状态拉取，则仅针对 `T_BIZ_ASSESSMENT_RECORD` 中 `compute_mode='ASYNC' AND status='RUNNING'` 的记录做标准状态更新。
+2) `controller/DisasterSurveyTaskManagerController.java` & `service/impl/DisasterSurveyTaskServiceImpl.java`：
+   - 梳理其中真正还在使用的历史查询或模型调用能力，下沉到 `survey` 子域服务中；清理与 `T_FX_SURVEY_HISTORY` 强耦合的冗余旧逻辑。
+3) `controller/EvaluateTaskManagerController.java` & `service/impl/EvaluateTaskServiceImpl.java` & `EvaluateTaskExeServiceImpl.java`：
+   - 将 `EvaluateTaskExeServiceImpl` 抽象为标准外部模型执行器（`ExternalModelExecutor`），仅供重型遥感/SAR模型异步调用；移除与业务流程强耦合的混乱代码。
+4) `controller/StepComputeController.java` & `service/impl/StepComputeServiceImpl.java`：
+   - 这是目前实际承载业务计算的核心类。请将其按职责拆分为：
+     - `SurveyOverlayComputeService`（负责受灾人口、乡镇面积、4类承灾体叠置及对比核查计算）
+     - `StormSurgeAssessmentService`（负责速报数据标准化归一化、经济损失测算、风暴潮综合评估）
+     - `SeaWindAssessmentService`（负责 SAR 海风破坏性分析、海风行为分析、海风综合评估）
+     - `SeaWaveAssessmentService`（负责 SAR 海浪破坏性分析、海浪行为分析、海浪综合评估）
+5) `controller/ExposureDataController.java` & `service/impl/ExposureDataServiceImpl.java`：
+   - 保留核心查询能力，统一入参和出参的承灾体类型编码为 `ExposureTypeEnum`（`SEAWALL/FISHING_PORT/MARICULTURE/TOURIST_AREA`），消除前后端字段映射补丁。
+6) `controller/SurveyBaselineController.java` & `controller/HazardDossierController.java` & `controller/EvaluateReportController.java`：
+   - 规范入参均关联 `event_id`，完善基线确认锁状态校验（`DRAFT -> CONFIRMED`）。
+7) `controller/BizFrontendDataController.java` & `service/impl/BizFrontendDataServiceImpl.java`：
+   - 阶段一至阶段四暂时保留只读兼容，阶段五完成前端迁移后标记 `@Deprecated` 并下线。
+
+4.3 规范后的 REST API 契约（统一前缀与语义）
+【灾害事件】
+- `POST /api/v1/disaster-events`                     : 创建灾害事件
+- `GET  /api/v1/disaster-events`                     : 分页查询事件列表
+- `GET  /api/v1/disaster-events/{eventId}`           : 查询事件详情（含关联的基线与评估进度概览）
+
+【灾情调查模块 - 4步闭环】
+- Step1 基础底数：
+  - `GET  /api/v1/survey/base/region-population`     : 按区县/坐标查询行政区划与人口密度
+  - `GET  /api/v1/survey/base/exposures`             : 按区县/类型查询4类承灾体基础台账与空间位置
+- Step2 遥感范围识别：
+  - `POST /api/v1/survey/events/{eventId}/affected-area` : 加载/解译灾后遥感影像，保存受灾范围 GeoJSON
+- Step3 叠置分析与影像导出：
+  - `POST /api/v1/survey/events/{eventId}/overlay-analysis` : 执行受灾范围与人口/乡镇/4类承灾体空间叠置分析
+  - `POST /api/v1/survey/events/{eventId}/exposure-images/export` : 按4类承灾体导出对应区域灾后遥感影像
+- Step4 对比核查与基线固化：
+  - `POST /api/v1/survey/events/{eventId}/compare-quick-report` : 接入灾情速报数据，与遥感结果对比生成柱状图/表格数据
+  - `POST /api/v1/survey/events/{eventId}/baseline/confirm` : 确认核查结果并锁定《调查基线》
+  - `GET  /api/v1/survey/events/{eventId}/baseline`  : 获取最新调查基线详情
+  - `GET/POST /api/v1/survey/events/{eventId}/dossiers` : 承灾体现场核查档案管理
+
+【灾害评估模块 - 三灾种分轨 + 报告】
+- 风暴潮：
+  - `POST /api/v1/assessment/events/{eventId}/storm-surge/integrate`     : 速报受灾信息标准化整合
+  - `POST /api/v1/assessment/events/{eventId}/storm-surge/economic-loss` : 经济损失评估测算
+  - `POST /api/v1/assessment/events/{eventId}/storm-surge/comprehensive` : 风暴潮综合评估
+- 海风：
+  - `POST /api/v1/assessment/events/{eventId}/sea-wind/damage`           : SAR海风破坏性分析
+  - `POST /api/v1/assessment/events/{eventId}/sea-wind/behavior`         : 海风行为分析
+  - `POST /api/v1/assessment/events/{eventId}/sea-wind/comprehensive`    : 海风综合评估
+- 海浪：
+  - `POST /api/v1/assessment/events/{eventId}/sea-wave/damage`           : SAR海浪破坏性分析
+  - `POST /api/v1/assessment/events/{eventId}/sea-wave/behavior`         : 海浪行为分析
+  - `POST /api/v1/assessment/events/{eventId}/sea-wave/comprehensive`    : 海浪综合评估
+- 评估记录与报告归档：
+  - `GET  /api/v1/assessment/events/{eventId}/records`                   : 查询事件下所有评估子项记录
+  - `POST /api/v1/assessment/events/{eventId}/reports/generate`          : 生成风暴潮/海风/海浪综合评估报告
+  - `GET  /api/v1/assessment/reports`                                    : 报告归档列表与下载
+
+================================================================================
+五、 前端重构详细清单
+================================================================================
+
+（Cursor 执行前请先定位前端代码根目录，检查 `views/survey`、`views/assessment`、`api`、`store`、`router`）
+
+5.1 统一枚举与路由清理
+- 新建 `src/constants/disasterEnums.js`（或 `.ts`），与后端 `DisasterTypeEnum`、`ExposureTypeEnum`、`BaselineStatusEnum` 100% 保持一致。
+- 清理前端多处散落的承灾体中英文硬编码映射（如 `seawall` <-> `dike`、`fishing` <-> `fishery`）。
+- 规范前端路由路径：
+  - 灾情调查：`/survey/...`
+  - 灾害评估：`/assessment/storm-surge/...`、`/assessment/sea-wind/...`、`/assessment/sea-wave/...`、`/assessment/reports`
+  - 移除 `economic`、`seabreeze`、`seawave` 等历史冗余别名路由。
+
+5.2 彻底隔离 MOCK 数据（红线要求）
+- 在环境变量中增加明确开关：`VITE_USE_MOCK=false`（默认生产/联调关闭）。
+- 严禁在 API 请求的 `catch` 分支或返回空数据时静默 fallback 到 `mock/` 目录下的假数据！
+- 改造方式：仅当 `import.meta.env.VITE_USE_MOCK === 'true'` 时才由统一的 Mock 适配层拦截返回演示数据；关闭时必须真实请求后端接口，异常时弹出明确错误提示，保证数据流 100% 可信。
+
+5.3 全局状态与上下游打通（Store 重构）
+- 在全局 Store（Pinia/Vuex）中维护 `useDisasterWorkflowStore`：
+  - `currentEventId`：当前操作的灾害事件 ID
+  - `currentBaseline`：当前事件的调查基线对象（含状态 `DRAFT` / `CONFIRMED`）
+- 业务联动规则：
+  - 进入“灾情调查”时必须绑定或新建一个 `eventId`，按 4 步向导顺序执行，Step4 点击【确认并锁定基线】后更新 `currentBaseline.status = 'CONFIRMED'`。
+  - 进入“灾害评估”时自动读取 `currentEventId` 和已确认的 `currentBaseline`；若尚未确认基线，在风暴潮经济损失/综合评估页给出清晰提示（支持一键跳转完成调查或选择历史已确认基线）。
+
+5.4 页面职责与组件清理
+- 灾情调查页面：严格收敛为 4 个清晰步骤面板（1.基础底数查询 -> 2.遥感范围识别 -> 3.叠置分析与4类承灾体影像导出 -> 4.遥感vs速报对比核查与基线确认），所有图表（对比柱状图、数据表）直接消费后端 `compare-quick-report` 返回的结构化数据。
+- 灾害评估页面：按【风暴潮 / 海风 / 海浪】三大灾种清晰分组，每个灾种下严格对应其 3 个评估环节，评估结果实时落库到 `T_BIZ_ASSESSMENT_RECORD`，并支持一键生成与预览归档报告。
+- 移除前端所有对 `/biz-frontend-data` 万能表接口的调用。
+
+================================================================================
+六、 Cursor 分阶段执行计划（请逐阶段执行并验证）
+================================================================================
+
+【阶段一：基础枚举与数据层建表】
+- 任务：
+  1. 后端 `disaster-survey-core` 新增统一领域枚举（2.1 ~ 2.5）。
+  2. 新增 `BizDisasterEventModel`、`BizAssessmentRecordModel` 及对应 DAO。
+  3. 升级 `BizSurveyBaselineModel`、`BizHazardDossierModel`、`BizReportArchiveModel` 字段以支持 `event_id` 主线关联。
+  4. 更新 `BizSchemaInitializer.java` 与初始化 SQL，确保启动时能自动建表/平滑补齐字段。
+- 验收标准：Maven 后端编译通过，数据库初始化脚本无报错。
+
+【阶段二：后端“灾害事件 + 灾情调查”子域重构】
+- 任务：
+  1. 实现 `DisasterEventController` / `Service`。
+  2. 拆分 `StepComputeServiceImpl` 中的调查计算逻辑到 `SurveyOverlayComputeService`，实现 `/api/v1/survey/**` 4步闭环接口。
+  3. 统一 `ExposureDataController` 的承灾体枚举规范。
+  4. 完善基线确认锁定逻辑（`DRAFT -> CONFIRMED`）。
+- 验收标准：通过 Swagger/单元测试跑通“创建事件 -> 4步灾情调查 -> 锁定基线”完整链路。
+
+【阶段三：后端“灾害评估”子域重构与死代码清理】
+- 任务：
+  1. 将 `StepComputeServiceImpl` 中的评估逻辑拆分为 `StormSurgeAssessmentService`、`SeaWindAssessmentService`、`SeaWaveAssessmentService`，评估结果统一结构化写入 `T_BIZ_ASSESSMENT_RECORD`。
+  2. 实现 `/api/v1/assessment/**` 三灾种接口及统一报告生成归档接口。
+  3. 清理 `ExecuteEvaluateScheduleTask.java` 注释死代码与无关项目注释；整理 `EvaluateTaskExeServiceImpl` 为纯粹的外部异步模型执行器。
+- 验收标准：后端三灾种评估接口及报告归档全部跑通，无残留死代码与无关注释。
+
+【阶段四：前端枚举统一、Mock 隔离与灾情调查页重构】
+- 任务：
+  1. 新建前端统一枚举常量与 `useDisasterWorkflowStore`。
+  2. 全面排查并移除 API 请求中“失败静默回落 Mock”的代码，统一受控于 `VITE_USE_MOCK`。
+  3. 封装 `/api/v1/disaster-events` 和 `/api/v1/survey/**` 请求模块，重构灾情调查 4 步页面并对接真实接口。
+- 验收标准：`VITE_USE_MOCK=false` 下，前端可完整跑通灾情调查 4 步并锁定基线。
+
+【阶段五：前端灾害评估页重构、下线万能表与回归验证】
+- 任务：
+  1. 清理前端评估模块冗余路由，按风暴潮/海风/海浪三轨对接 `/api/v1/assessment/**` 真实接口与报告归档页。
+  2. 删除前端对 `BizFrontendDataController` 的所有调用，并在后端将 `BizFrontendDataController` 标记 `@Deprecated`（确认无引用后可移除）。
+  3. 全链路回归测试：新建事件 -> 完成灾情调查并确认基线 -> 完成风暴潮/海风/海浪评估 -> 生成并下载综合评估报告。
+- 验收标准：前后端无报错、数据全链路可追溯、业务逻辑与需求文档 100% 一致。

@@ -35,15 +35,22 @@
 			<div v-if="baselineHint" class="wb-hint wb-gap">{{ baselineHint }}</div>
 			<div class="report-actions">
 				<el-button
+					v-if="store.currentType === 'storm' && !workflowStore.isBaselineConfirmed"
+					type="warning"
+					class="max-w"
+					@click="router.push('/survey')">
+					前往确认调查基线
+				</el-button>
+				<el-button
 					type="primary"
 					class="max-w"
 					:loading="store.reportGenerating"
-					:disabled="store.reportGenerating"
+					:disabled="store.reportGenerating || (store.currentType === 'storm' && !workflowStore.isBaselineConfirmed)"
 					@click="runReport">
-					生成评估报告
+					生成综合评估报告
 				</el-button>
 				<el-button class="max-w" :loading="store.reportLoading" @click="onReplay">按当前场景复盘</el-button>
-				<el-button class="max-w" :loading="archiving" @click="onArchive">归档当前报告</el-button>
+				<el-button class="max-w" :loading="archiving" @click="onArchive">生成并归档报告</el-button>
 			</div>
 		</section>
 		<section class="wb-block" v-if="store.archivedReports.length">
@@ -65,19 +72,30 @@
 
 <script setup>
 	import { computed, ref } from 'vue'
+	import { useRouter } from 'vue-router'
+	import { BaselineStatusLabel } from '@/constants/disasterEnums.js'
 	import { useAssessmentStore } from '@/store/modules/assessment.js'
 	import { useSurveyBaselineStore } from '@/store/modules/surveyBaseline.js'
 	import { useAssessmentActions } from '@/views/assessment/composables/useAssessmentActions.js'
 
+	const router = useRouter()
 	const store = useAssessmentStore()
 	const baselineStore = useSurveyBaselineStore()
-	const { runReport, archiveReport, openArchivedReport, replayScenario } = useAssessmentActions()
+	const { runReport, archiveReport, openArchivedReport, replayScenario, workflowStore } = useAssessmentActions()
 	const archiving = ref(false)
 
 	const baselineHint = computed(() => {
+		if (!workflowStore.currentEventId) {
+			return '未绑定灾害事件：请先完成灾情调查或选择历史已确认事件。'
+		}
+		if (!workflowStore.isBaselineConfirmed) {
+			const st = workflowStore.currentBaseline?.status
+			const stLabel = st ? BaselineStatusLabel[st] || st : '未生成'
+			return `调查基线状态：${stLabel}。风暴潮综合评估需先确认锁定基线。`
+		}
 		const pkg = baselineStore.package
-		if (!pkg?.affectedMeta) return '尚未加载调查基线：可先在灾情调查完成识别/叠置，或点击「按当前场景复盘」。'
-		return `已衔接调查基线（场景 ${pkg.sceneId || '-'}，受灾 ${pkg.affectedMeta.areaKm2 ?? '-'} km²）`
+		const area = workflowStore.currentBaseline?.affectedAreaKm2 ?? pkg?.affectedMeta?.areaKm2
+		return `已衔接确认基线（事件 ${workflowStore.currentEventId}，受灾 ${area ?? '-'} km²）`
 	})
 
 	const onReplay = async () => {

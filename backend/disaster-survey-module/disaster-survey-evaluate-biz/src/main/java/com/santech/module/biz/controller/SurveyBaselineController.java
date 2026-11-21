@@ -48,6 +48,12 @@ public class SurveyBaselineController {
 		return surveyBaselineService.getBySceneId(sceneId);
 	}
 
+	@GetMapping("/getByEvent")
+	@ApiOperation("按灾害事件获取最新调查基线")
+	public ExecuteResult<Map<String, Object>> getByEvent(@RequestParam("eventId") String eventId) {
+		return surveyBaselineService.getByEventId(eventId);
+	}
+
 	@GetMapping("/latest")
 	@ApiOperation("获取最近一条调查基线")
 	public ExecuteResult<Map<String, Object>> latest() {
@@ -55,9 +61,16 @@ public class SurveyBaselineController {
 	}
 
 	@PostMapping("/save")
-	@ApiOperation("按 sceneId 保存/更新调查基线包")
+	@ApiOperation("保存/更新调查基线包（CONFIRMED/ARCHIVED 状态拒绝修改）")
 	public ExecuteResult<Map<String, Object>> save(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
 		return surveyBaselineService.save(payload, operator(request));
+	}
+
+	@PostMapping("/confirm")
+	@ApiOperation("确认锁定调查基线 DRAFT -> CONFIRMED")
+	public ExecuteResult<Map<String, Object>> confirm(@RequestParam("eventId") String eventId,
+			HttpServletRequest request) {
+		return surveyBaselineService.confirm(eventId, operator(request));
 	}
 
 	@GetMapping("/list")

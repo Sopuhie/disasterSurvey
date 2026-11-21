@@ -7,10 +7,18 @@
 					<div>
 						<h3>{{ store.typeConfig.label }}评估</h3>
 						<p>{{ currentStepMeta?.label }} · {{ currentStepMeta?.desc }}</p>
+						<p v-if="eventHint" class="assess-event-hint">{{ eventHint }}</p>
 					</div>
 					<span class="assess-left-collapse flex faj cp" title="收起面板" @click="setLeftCollapsed(true)">
 						<el-icon :size="16"><DArrowLeft /></el-icon>
 					</span>
+				</div>
+				<div v-if="showBaselineGate" class="assess-baseline-gate">
+					<p>风暴潮经济损失 / 综合评估需要已确认的调查基线。</p>
+					<div class="assess-baseline-gate__actions">
+						<el-button type="primary" size="small" @click="goSurvey">前往完成调查</el-button>
+						<el-button size="small" @click="pickConfirmedEvent" :loading="pickingEvent">选择历史已确认事件</el-button>
+					</div>
 				</div>
 				<div class="wb-types">
 					<button
@@ -89,19 +97,99 @@
 	import ReportPreview from './components/ReportPreview.vue'
 	import StormDetailDialog from './components/StormDetailDialog.vue'
 	import { DArrowLeft } from '@element-plus/icons-vue'
-	import { ASSESS_TYPES } from './constants.js'
+	import { ElMessage, ElMessageBox } from 'element-plus'
+	import { useRoute, useRouter } from 'vue-router'
+	import { BaselineStatusLabel } from '@/constants/disasterEnums.js'
+	import { ASSESS_TYPES, resolveTypeFromRoute } from './constants.js'
 	import { useAppStore } from '@/store/modules/app.js'
 	import { useAssessmentStore } from '@/store/modules/assessment.js'
 	import { useAssessmentActions } from './composables/useAssessmentActions.js'
 	import { clearAssessmentLayers } from './utils/assessmentLayers.js'
 
+	const route = useRoute()
+	const router = useRouter()
 	const appStore = useAppStore()
 	const store = useAssessmentStore()
-	const { initAssessment, destroyAssessment, ensureAssessmentStepResult } = useAssessmentActions()
+	const { initAssessment, destroyAssessment, ensureAssessmentStepResult, workflowStore } = useAssessmentActions()
 	const types = ASSESS_TYPES
+	const pickingEvent = ref(false)
 
 	const currentStepMeta = computed(() => store.steps.find(item => item.id === store.currentStep) || store.steps[0] || {})
 	const nextStep = computed(() => store.steps.find(item => item.index === (currentStepMeta.value.index || 0) + 1))
+	const eventHint = computed(() => {
+		const name = workflowStore.currentEvent?.eventName || workflowStore.currentEventId
+		if (!name) return '未绑定灾害事件'
+		const st = workflowStore.currentBaseline?.status
+		const stLabel = st ? BaselineStatusLabel[st] || st : '未确认'
+		return `事件：${name} · 基线：${stLabel}`
+	})
+	const showBaselineGate = computed(() => {
+		const needBaseline =
+			store.currentType === 'storm' && (store.currentStep === 'loss' || store.currentStep === 'report')
+		return needBaseline && !workflowStore.isBaselineConfirmed
+	})
+
+	const goSurvey = () => router.push('/survey')
+
+	const pickConfirmedEvent = async () => {
+		pickingEvent.value = true
+		try {
+			const { list } = await workflowStore.listEvents({ status: 'ACTIVE', size: 50 })
+			const options = (list || []).filter(Boolean)
+			if (!options.length) {
+				ElMessage.warning('暂无可用灾害事件，请先新建并完成调查')
+				return
+			}
+			const labels = options.map(
+				(item, idx) => `${idx + 1}. ${item.eventName || item.id}${item.regionName ? `（${item.regionName}）` : ''}`
+			)
+			const { value } = await ElMessageBox.prompt(
+				`请输入序号选择事件：\n${labels.slice(0, 12).join('\n')}`,
+				'选择历史事件',
+				{
+					confirmButtonText: '绑定',
+					cancelButtonText: '取消',
+					inputPattern: /^[1-9]\d*$/,
+					inputErrorMessage: '请输入有效序号'
+				}
+			)
+			const picked = options[Number(value) - 1]
+			if (!picked?.id && !picked?.eventId) {
+				ElMessage.warning('无效选择')
+				return
+			}
+			await workflowStore.bindExistingEvent(picked.id || picked.eventId)
+			if (!workflowStore.isBaselineConfirmed) {
+				ElMessage.warning('该事件调查基线尚未确认，可前往灾情调查完成锁定')
+			} else {
+				ElMessage.success('已绑定已确认基线的事件')
+			}
+			await initAssessment(store.currentType)
+		} catch (e) {
+			if (e !== 'cancel' && e?.message) ElMessage.error(e.message)
+		} finally {
+			pickingEvent.value = false
+		}
+	}
+
+	const applyRouteMeta = async () => {
+		const typeId =
+			route.meta?.assessType ||
+			resolveTypeFromRoute(String(route.path).split('/').pop()) ||
+			store.currentType
+		if (typeId && typeId !== store.currentType) {
+			clearAssessmentLayers()
+			store.setType(typeId)
+			store.reset()
+		}
+		if (route.meta?.assessStep) {
+			store.setStep(route.meta.assessStep)
+		}
+		await initAssessment(store.currentType)
+		if (route.meta?.reportsOnly || route.meta?.assessStep === 'report') {
+			await ensureAssessmentStepResult('report')
+		}
+	}
 
 	const setLeftCollapsed = collapsed => {
 		store.setLeftPanelCollapsed(collapsed)
@@ -140,16 +228,28 @@
 
 	const switchType = async item => {
 		if (store.currentType === item.id) return
+		const target = item.path || ASSESS_TYPES.find(t => t.id === item.id)?.path
+		if (target && route.path !== target) {
+			await router.push(target)
+			return
+		}
 		clearAssessmentLayers()
 		store.setType(item.id)
 		store.reset()
 		await initAssessment(item.id)
 	}
 
+	watch(
+		() => route.fullPath,
+		() => {
+			applyRouteMeta()
+		},
+		{ immediate: true }
+	)
+
 	onMounted(() => {
 		appStore.setCurNavObj('灾害评估')
 		store.setLeftPanelCollapsed(false)
-		initAssessment(store.currentType)
 	})
 
 	onUnmounted(() => {
@@ -164,6 +264,27 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 8px;
+	}
+	.assess-event-hint {
+		margin-top: 4px;
+		font-size: 12px;
+		color: #5c6b7a;
+	}
+	.assess-baseline-gate {
+		margin: 0 12px 10px;
+		padding: 10px 12px;
+		border-radius: 8px;
+		background: #fff7e6;
+		border: 1px solid #ffd591;
+		color: #ad6800;
+		font-size: 13px;
+		line-height: 1.5;
+		&__actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-top: 8px;
+		}
 	}
 	.assess-left-collapse {
 		flex-shrink: 0;

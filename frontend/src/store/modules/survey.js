@@ -31,6 +31,10 @@ export const useSurveyStore = defineStore('survey', {
 		compareType: 'seawall',
 		compareView: 'chart',
 		compareRows: [],
+		/** 后端 compare-quick-report 指标行（metric/rs/quick） */
+		compareMetricRows: [],
+		compareChart: null,
+		imageExports: null,
 		loadingHazards: false,
 		/** 后端调查任务 ID（liteMode 落库；失败则为空走本地） */
 		surveyTaskId: '',
@@ -74,6 +78,9 @@ export const useSurveyStore = defineStore('survey', {
 			this.compareType = 'seawall'
 			this.compareView = 'chart'
 			this.compareRows = []
+			this.compareMetricRows = []
+			this.compareChart = null
+			this.imageExports = null
 			this.surveyTaskId = ''
 			this.overlayTaskId = ''
 		}

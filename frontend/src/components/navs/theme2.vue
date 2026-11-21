@@ -125,25 +125,28 @@
 
 	const lists = computed(() => {
 		let data = [
-			{ title: '基础数据服务', path: '/provinceSystem' },
-			{ title: '灾情调查', path: '/disasterSurvey' },
-			{ title: '灾害评估', path: '/disasterAssessment' },
-			{ title: '运维管理', path: '/management' }
+			{ title: '基础数据服务', path: '/provinceSystem', match: '/provinceSystem' },
+			{ title: '灾情调查', path: '/survey', match: '/survey' },
+			{ title: '灾害评估', path: '/assessment/storm-surge', match: '/assessment' },
+			{ title: '运维管理', path: '/management', match: '/management' }
 		]
 		return data
 	})
+
+	const resolveNavIdx = path =>
+		lists.value.findIndex(item => path === item.path || path.startsWith(`${item.match || item.path}/`) || path === item.match)
 
 	// 监听当前路由
 	watch(
 		() => route.path,
 		newRoute => {
-			navIdx.value = lists.value.findIndex(item => newRoute.includes(item.path))
+			navIdx.value = resolveNavIdx(newRoute)
 		},
-		{ immediate: true, immediate: true }
+		{ immediate: true }
 	)
 
 	onMounted(() => {
-		navIdx.value = lists.value.findIndex(item => item.path === route.path)
+		navIdx.value = resolveNavIdx(route.path)
 	})
 
 	const handleCommand = command => {

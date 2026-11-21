@@ -26,10 +26,11 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * 前端调查/评估 MOCK 台账对应的真实 CRUD 接口。
- * 表为空时前端自行回落 MOCK。
+ * @deprecated 万能表接口已下线业务主路径。灾情调查请使用 {@code /api/v1/survey/**}，
+ * 灾害评估请使用 {@code /api/v1/assessment/**}。本控制器仅保留运维台账过渡期 CRUD，后续版本移除。
  */
-@Api(tags = "Evaluate-前端业务台账接口")
+@Deprecated
+@Api(tags = "Evaluate-前端业务台账接口(已废弃)")
 @RestController
 @RequestMapping("/web-disaster-evaluate/web/disaster/evaluate/bizdata")
 public class BizFrontendDataController {
@@ -45,8 +46,9 @@ public class BizFrontendDataController {
 		return ExecuteResult.error(e.getMessage(), null);
 	}
 
+	@Deprecated
 	@GetMapping("/list")
-	@ApiOperation("按类型列出业务数据（无数据时返回空数组，前端回落 MOCK）")
+	@ApiOperation("【已废弃】按类型列出业务数据")
 	public ExecuteResult<List<Map<String, Object>>> list(
 			@RequestParam("dataType") String dataType,
 			@RequestParam(value = "keyword", required = false) String keyword,
@@ -54,32 +56,37 @@ public class BizFrontendDataController {
 		return bizFrontendDataService.list(dataType, keyword, extraType);
 	}
 
+	@Deprecated
 	@PostMapping("/queryWithPage")
-	@ApiOperation("分页查询业务数据")
+	@ApiOperation("【已废弃】分页查询业务数据")
 	public ExecuteResult<List<Map<String, Object>>> queryWithPage(@RequestBody BizFrontendDataQueryDto query) {
 		return bizFrontendDataService.queryWithPage(query);
 	}
 
+	@Deprecated
 	@GetMapping("/getById")
-	@ApiOperation("按 ID 查询")
+	@ApiOperation("【已废弃】按 ID 查询")
 	public ExecuteResult<Map<String, Object>> getById(@RequestParam("id") String id) {
 		return bizFrontendDataService.getById(id);
 	}
 
+	@Deprecated
 	@PostMapping("/save")
-	@ApiOperation("新增业务数据")
+	@ApiOperation("【已废弃】新增业务数据")
 	public ExecuteResult<Map<String, Object>> save(@RequestBody BizFrontendDataSaveDto dto, HttpServletRequest request) {
 		return bizFrontendDataService.save(dto, operator(request));
 	}
 
+	@Deprecated
 	@PostMapping("/update")
-	@ApiOperation("更新业务数据")
+	@ApiOperation("【已废弃】更新业务数据")
 	public ExecuteResult<Map<String, Object>> update(@RequestBody BizFrontendDataSaveDto dto, HttpServletRequest request) {
 		return bizFrontendDataService.update(dto, operator(request));
 	}
 
+	@Deprecated
 	@PostMapping("/batchSave")
-	@ApiOperation("批量写入业务数据（可用于把前端 MOCK 推送到服务器）")
+	@ApiOperation("【已废弃】批量写入业务数据")
 	public ExecuteResult<Map<String, Object>> batchSave(@RequestBody Map<String, Object> body, HttpServletRequest request) {
 		String dataType = body == null ? null : String.valueOf(body.get("dataType"));
 		@SuppressWarnings("unchecked")
@@ -87,26 +94,30 @@ public class BizFrontendDataController {
 		return bizFrontendDataService.batchSave(dataType, list, operator(request));
 	}
 
+	@Deprecated
 	@GetMapping("/delete")
-	@ApiOperation("删除业务数据")
+	@ApiOperation("【已废弃】删除业务数据")
 	public ExecuteResult<String> delete(@RequestParam("id") String id) {
 		return bizFrontendDataService.delete(id);
 	}
 
+	@Deprecated
 	@PostMapping("/reportArchive/save")
-	@ApiOperation("归档评估报告")
+	@ApiOperation("【已废弃】归档评估报告，请改用 POST /api/v1/assessment/events/{eventId}/reports/generate")
 	public ExecuteResult<Map<String, Object>> archiveReport(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
 		return bizFrontendDataService.archiveReport(payload, operator(request));
 	}
 
+	@Deprecated
 	@GetMapping("/reportArchive/list")
-	@ApiOperation("归档报告列表")
+	@ApiOperation("【已废弃】归档报告列表，请改用 GET /api/v1/assessment/reports")
 	public ExecuteResult<List<Map<String, Object>>> listArchives() {
 		return bizFrontendDataService.listArchives();
 	}
 
+	@Deprecated
 	@GetMapping("/reportArchive/getById")
-	@ApiOperation("归档报告详情")
+	@ApiOperation("【已废弃】归档报告详情，请改用 GET /api/v1/assessment/reports/{reportId}")
 	public ExecuteResult<Map<String, Object>> getArchiveById(@RequestParam("id") String id) {
 		return bizFrontendDataService.getArchiveById(id);
 	}

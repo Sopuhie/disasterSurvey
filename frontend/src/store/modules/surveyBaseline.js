@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { withMockFallback, isNonEmptyObject } from '@/api/withMockFallback.js'
+import { isMockEnabled } from '@/constants/disasterEnums.js'
 import {
 	remoteBaselineGet,
 	remoteBaselineLatest,
@@ -110,6 +111,8 @@ export const useSurveyBaselineStore = defineStore('surveyBaseline', {
 			this.package = pkg
 			writeLocal(pkg)
 			this.source = 'local'
+			/* 正式基线已走 /api/v1/survey/.../baseline；旧 baseline 接口仅 Mock 兼容 */
+			if (!isMockEnabled()) return this.package
 			try {
 				const { data, source } = await withMockFallback(
 					() => remoteBaselineSave(pkg),
@@ -130,6 +133,18 @@ export const useSurveyBaselineStore = defineStore('surveyBaseline', {
 		async loadByScene(sceneId = '') {
 			this.loading = true
 			try {
+				if (!isMockEnabled()) {
+					const local = readLocal()
+					if (sceneId && local?.sceneId && local.sceneId !== sceneId) {
+						this.package = null
+						return null
+					}
+					if (local) {
+						this.package = local
+						this.source = 'local'
+					}
+					return local
+				}
 				const { data, source } = await withMockFallback(
 					async () => {
 						if (sceneId) {
@@ -157,6 +172,10 @@ export const useSurveyBaselineStore = defineStore('surveyBaseline', {
 		},
 
 		async listBaselines(keyword = '') {
+			if (!isMockEnabled()) {
+				const local = readLocal()
+				return local ? [local] : []
+			}
 			const { data } = await withMockFallback(
 				() => remoteBaselineList(keyword),
 				() => {

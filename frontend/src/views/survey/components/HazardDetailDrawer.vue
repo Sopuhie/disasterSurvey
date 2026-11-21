@@ -305,6 +305,7 @@
 <script setup>
 	import { ElMessage, ElMessageBox } from 'element-plus'
 	import { surveyApi } from '@/api/survey/index.js'
+	import { useDisasterWorkflowStore } from '@/store/modules/disasterWorkflow.js'
 	import { VERIFY_STATUS_OPTIONS } from '@/views/survey/mock/hazardDossier.js'
 	import { HAZARD_TYPES } from '@/views/survey/constants.js'
 	import { monitorPlanLabels, SURVEY_KPI_NAMES, SURVEY_LABELS } from '@/shared/metricUnits.js'
@@ -320,6 +321,7 @@
 	const emit = defineEmits(['update:modelValue', 'archived'])
 
 	const api = surveyApi()
+	const workflowStore = useDisasterWorkflowStore()
 	const visible = computed({
 		get: () => props.modelValue,
 		set: val => emit('update:modelValue', val)
@@ -471,7 +473,8 @@
 				typeId: props.typeId,
 				hazard: props.hazard,
 				overlayNote: props.overlayNote,
-				compareNote: props.compareNote
+				compareNote: props.compareNote,
+				eventId: workflowStore.currentEventId
 			})
 			syncForms()
 			await Promise.all([filterMaterials(), filterAttachments()])

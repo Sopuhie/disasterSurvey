@@ -526,13 +526,14 @@
 
 	const sLeft = computed(() => {
 		const navWidth = appStore.switchObj.sidebarFlag ? 64 : 280
-		const isWorkbench = ['disasterSurvey', 'disasterAssessment'].includes(route.name)
+		const assessRouteNames = ['disasterAssessment', 'assessmentSeaWind', 'assessmentSeaWave', 'assessmentReports']
+		const isWorkbench = route.name === 'disasterSurvey' || assessRouteNames.includes(route.name)
 		const catalogOpen = mapStore.showMenuTree && route.name === 'ProvinceSystem'
 		if (isWorkbench || catalogOpen) {
 			// 左侧工作台收起后，菜单栏/工具栏贴菜单栏右缘左移
 			const workbenchCollapsed =
 				(route.name === 'disasterSurvey' && surveyStore.leftPanelCollapsed) ||
-				(route.name === 'disasterAssessment' && assessmentStore.leftPanelCollapsed)
+				(assessRouteNames.includes(route.name) && assessmentStore.leftPanelCollapsed)
 			if (workbenchCollapsed) {
 				return { left: `${navWidth + 48}px` }
 			}

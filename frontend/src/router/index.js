@@ -67,7 +67,7 @@ const routes = [
 				}
 			},
 			{
-				path: '/disasterSurvey',
+				path: '/survey',
 				name: 'disasterSurvey',
 				component: () => import('../views/survey/index.vue'),
 				meta: {
@@ -75,20 +75,84 @@ const routes = [
 				}
 			},
 			{
-				path: '/disasterSurvey/:id',
-				redirect: '/disasterSurvey'
+				path: '/survey/:id',
+				redirect: to => ({ path: '/survey', query: to.query })
 			},
 			{
-				path: '/disasterAssessment',
+				path: '/disasterSurvey',
+				redirect: '/survey'
+			},
+			{
+				path: '/disasterSurvey/:id',
+				redirect: '/survey'
+			},
+			{
+				path: '/assessment/storm-surge',
 				name: 'disasterAssessment',
 				component: () => import('../views/assessment/index.vue'),
 				meta: {
-					title: '灾害评估'
+					title: '灾害评估',
+					assessType: 'storm'
 				}
 			},
 			{
+				path: '/assessment/sea-wind',
+				name: 'assessmentSeaWind',
+				component: () => import('../views/assessment/index.vue'),
+				meta: {
+					title: '海风评估',
+					assessType: 'wind'
+				}
+			},
+			{
+				path: '/assessment/sea-wave',
+				name: 'assessmentSeaWave',
+				component: () => import('../views/assessment/index.vue'),
+				meta: {
+					title: '海浪评估',
+					assessType: 'wave'
+				}
+			},
+			{
+				path: '/assessment/reports',
+				name: 'assessmentReports',
+				component: () => import('../views/assessment/index.vue'),
+				meta: {
+					title: '评估报告归档',
+					assessType: 'storm',
+					assessStep: 'report',
+					reportsOnly: true
+				}
+			},
+			{
+				path: '/assessment',
+				redirect: '/assessment/storm-surge'
+			},
+			{
+				path: '/disasterAssessment',
+				redirect: '/assessment/storm-surge'
+			},
+			{
+				path: '/disasterAssessment/economic',
+				redirect: '/assessment/storm-surge'
+			},
+			{
+				path: '/disasterAssessment/seabreeze',
+				redirect: '/assessment/sea-wind'
+			},
+			{
+				path: '/disasterAssessment/seawave',
+				redirect: '/assessment/sea-wave'
+			},
+			{
 				path: '/disasterAssessment/:id',
-				redirect: '/disasterAssessment'
+				redirect: to => {
+					const id = String(to.params.id || '')
+					if (id === 'economic' || id === 'storm') return '/assessment/storm-surge'
+					if (id === 'seabreeze' || id === 'wind') return '/assessment/sea-wind'
+					if (id === 'seawave' || id === 'wave') return '/assessment/sea-wave'
+					return '/assessment/storm-surge'
+				}
 			},
 			{
 				path: '/management',

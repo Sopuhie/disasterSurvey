@@ -1,8 +1,10 @@
+import { ExposureTypeEnum, ExposureTypeLabel, toExposureLegacyId, toExposureType } from '@/constants/disasterEnums.js'
+
 export const SURVEY_STEPS = [
-	{ id: 'query', label: '基础查询', index: 1, desc: '行政区划与承灾体定位' },
-	{ id: 'identify', label: '受灾识别', index: 2, desc: '遥感影像受灾范围解译' },
-	{ id: 'overlay', label: '叠置分析', index: 3, desc: '与人口、区划及承灾体相交' },
-	{ id: 'compare', label: '上报对比', index: 4, desc: '解译结果与灾情速报对照' }
+	{ id: 'query', label: '基础底数查询', index: 1, desc: '行政区划、人口密度与承灾体台账' },
+	{ id: 'identify', label: '遥感范围识别', index: 2, desc: '灾后遥感影像受灾范围解译' },
+	{ id: 'overlay', label: '叠置与影像导出', index: 3, desc: '人口/乡镇/四类承灾体叠置及影像导出' },
+	{ id: 'compare', label: '对比核查与基线确认', index: 4, desc: '遥感 vs 速报对比并锁定调查基线' }
 ]
 
 export const LAYER_NAMES = {
@@ -16,31 +18,36 @@ export const LAYER_NAMES = {
 	tourist: 'touristAreaLyr'
 }
 
+/** id 保留历史短码供图层兼容；exposureType 为前后端统一编码 */
 export const HAZARD_TYPES = [
 	{
 		id: 'seawall',
-		label: '海堤',
+		exposureType: ExposureTypeEnum.SEAWALL,
+		label: ExposureTypeLabel[ExposureTypeEnum.SEAWALL],
 		dataKey: '海岸防护工程',
 		layerName: LAYER_NAMES.seawall,
 		geomKind: 'line'
 	},
 	{
 		id: 'fishing',
-		label: '渔港',
+		exposureType: ExposureTypeEnum.FISHING_PORT,
+		label: ExposureTypeLabel[ExposureTypeEnum.FISHING_PORT],
 		dataKey: '渔港',
 		layerName: LAYER_NAMES.fishing,
 		geomKind: 'polygon'
 	},
 	{
 		id: 'mariculture',
-		label: '海水养殖区',
+		exposureType: ExposureTypeEnum.MARICULTURE,
+		label: ExposureTypeLabel[ExposureTypeEnum.MARICULTURE],
 		dataKey: '海水养殖区',
 		layerName: LAYER_NAMES.mariculture,
 		geomKind: 'polygon'
 	},
 	{
 		id: 'tourist',
-		label: '滨海旅游区',
+		exposureType: ExposureTypeEnum.TOURIST_AREA,
+		label: ExposureTypeLabel[ExposureTypeEnum.TOURIST_AREA],
 		dataKey: '滨海旅游区',
 		layerName: LAYER_NAMES.tourist,
 		geomKind: 'polygon'
@@ -49,7 +56,7 @@ export const HAZARD_TYPES = [
 
 export const OVERLAY_TARGETS = [
 	{ id: 'population', label: '人口密度', kind: 'district' },
-		{ id: 'district', label: '乡镇区划', kind: 'district' },
+	{ id: 'district', label: '乡镇区划', kind: 'district' },
 	...HAZARD_TYPES.map(item => ({ id: item.id, label: item.label, kind: 'hazard' }))
 ]
 
@@ -99,9 +106,18 @@ export const OVERLAY_STYLE = {
 }
 
 export function getHazardType(id) {
-	return HAZARD_TYPES.find(item => item.id === id)
+	const legacy = toExposureLegacyId(id)
+	return (
+		HAZARD_TYPES.find(item => item.id === id || item.id === legacy || item.exposureType === id) ||
+		HAZARD_TYPES.find(item => item.exposureType === toExposureType(id))
+	)
 }
 
 export function getOverlayTarget(id) {
-	return OVERLAY_TARGETS.find(item => item.id === id)
+	const legacy = toExposureLegacyId(id)
+	return OVERLAY_TARGETS.find(item => item.id === id || item.id === legacy)
+}
+
+export function getHazardExposureType(id) {
+	return getHazardType(id)?.exposureType || toExposureType(id)
 }

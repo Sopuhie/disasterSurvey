@@ -40,6 +40,14 @@
 	const treeData = ref([])
 	const selectedName = ref('')
 	let pathName = {
+		'/survey/0': 'Coastal',
+		'/survey/1': 'Fishing',
+		'/survey/2': 'Seawater',
+		'/survey/3': 'Marina',
+		'/assessment/sea-wave': 'Seawave',
+		'/assessment/sea-wind': 'Seabreeze',
+		'/assessment/storm-surge': 'Economic',
+		// 历史路径兼容
 		'/disasterSurvey/0': 'Coastal',
 		'/disasterSurvey/1': 'Fishing',
 		'/disasterSurvey/2': 'Seawater',

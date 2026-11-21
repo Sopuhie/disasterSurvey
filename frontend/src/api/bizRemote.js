@@ -1,6 +1,8 @@
 import request from '@/utils/request.js'
 import { unwrapExecuteResult } from '@/api/withMockFallback.js'
+import { ExposureEntityType, toExposureType } from '@/constants/disasterEnums.js'
 
+/** @deprecated 万能表已下线业务主路径；运维台账过渡期仍可调用，调查/评估请走 /api/v1/** */
 const BIZ = '/web-disaster-evaluate/web/disaster/evaluate/bizdata'
 const EXPOSURE = '/web-disaster-evaluate/web/disaster/evaluate/exposure'
 const DOSSIER = '/web-disaster-evaluate/web/disaster/evaluate/dossier'
@@ -8,15 +10,14 @@ const BASELINE = '/web-disaster-evaluate/web/disaster/evaluate/baseline'
 
 const quiet = { hideErrorMsg: true, timeout: 12000 }
 
-const HAZARD_EXPOSURE_TYPE = {
-	seawall: 'Dike',
-	fishing: 'Fishery',
-	mariculture: 'CultureArea',
-	tourist: 'TouristArea'
+/** 承灾体短码/标准码 → 后端实体类型（兼容旧接口）；新接口请直接用 ExposureTypeEnum */
+export function getExposureTypeByHazard(type) {
+	const code = toExposureType(type)
+	return code ? ExposureEntityType[code] : ''
 }
 
-export function getExposureTypeByHazard(type) {
-	return HAZARD_EXPOSURE_TYPE[type] || ''
+export function getExposureEnumByHazard(type) {
+	return toExposureType(type) || ''
 }
 
 export async function remoteBizList(dataType, { keyword = '', extraType = '' } = {}) {
@@ -95,7 +96,10 @@ export async function remoteBizGetById(id) {
 }
 
 export async function remoteExposureList(hazardOrExposureType, keyword = '') {
-	const exposureType = HAZARD_EXPOSURE_TYPE[hazardOrExposureType] || hazardOrExposureType
+	const exposureType =
+		toExposureType(hazardOrExposureType) ||
+		ExposureEntityType[hazardOrExposureType] ||
+		hazardOrExposureType
 	const res = await request({
 		url: `${EXPOSURE}/list`,
 		method: 'get',
@@ -105,6 +109,7 @@ export async function remoteExposureList(hazardOrExposureType, keyword = '') {
 	return unwrapExecuteResult(res) || []
 }
 
+/** @deprecated 请使用 api/assessment/pipeline.js#generateAssessmentReport */
 export async function remoteArchiveReport(payload) {
 	const res = await request({
 		url: `${BIZ}/reportArchive/save`,
@@ -115,6 +120,7 @@ export async function remoteArchiveReport(payload) {
 	return unwrapExecuteResult(res)
 }
 
+/** @deprecated 请使用 api/assessment/pipeline.js#listAssessmentReports */
 export async function remoteListArchives() {
 	const res = await request({
 		url: `${BIZ}/reportArchive/list`,
@@ -124,6 +130,7 @@ export async function remoteListArchives() {
 	return unwrapExecuteResult(res) || []
 }
 
+/** @deprecated 请使用 api/assessment/pipeline.js#getAssessmentReport */
 export async function remoteGetArchive(id) {
 	const res = await request({
 		url: `${BIZ}/reportArchive/getById`,
@@ -136,12 +143,12 @@ export async function remoteGetArchive(id) {
 
 /**
  * 承灾体：合并 DB_DANGER 暴露库 + 运维业务台账（台账同 id 覆盖暴露库）。
- * 二者皆空时返回 []，由上层回落 MOCK。
+ * 业务主路径请优先 /api/v1/survey/base/exposures；本方法仅运维/Mock 过渡。
  */
 export async function remoteHazardOrBizList(type, keyword = '') {
 	let exposure = []
 	let biz = []
-	if (HAZARD_EXPOSURE_TYPE[type]) {
+	if (toExposureType(type) || ExposureEntityType[type]) {
 		try {
 			exposure = await remoteExposureList(type, keyword)
 		} catch (e) {

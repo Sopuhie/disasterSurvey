@@ -88,6 +88,17 @@ public class BizFrontendDataDao extends BaseDao {
 		return queryObjects(BizReportArchiveModel.class, "1=1 order by CJSJ desc", new HashMap<>());
 	}
 
+	public List<BizReportArchiveModel> listArchivesByEventId(String eventId) throws Exception {
+		Map<String, Object> params = new HashMap<>();
+		params.put("eventId", eventId);
+		return queryObjects(BizReportArchiveModel.class,
+				"EVENT_ID=:eventId order by CJSJ desc", params);
+	}
+
+	public int updateArchive(BizReportArchiveModel model) throws Exception {
+		return basicDatabase.ORM.update(model);
+	}
+
 	public int executeDdl(String sql) throws Exception {
 		return basicDatabase.SQL.updateSql(sql);
 	}

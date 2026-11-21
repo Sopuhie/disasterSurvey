@@ -95,7 +95,17 @@
 					:label="sceneLabel(item)"
 					:value="item.id" />
 			</el-select>
-			<el-button type="primary" class="max-w" :loading="store.lossLoading" @click="runLoss">开始评估</el-button>
+			<p v-if="!workflowStore.isBaselineConfirmed" class="wb-hint wb-gap" style="color: #ad6800">
+				需先确认调查基线后才能测算经济损失。
+			</p>
+			<el-button
+				type="primary"
+				class="max-w"
+				:loading="store.lossLoading"
+				:disabled="!workflowStore.isBaselineConfirmed"
+				@click="runLoss">
+				开始评估
+			</el-button>
 		</section>
 	</div>
 </template>
@@ -114,7 +124,8 @@
 		queryDistrictByCoord,
 		toggleThemeLayer,
 		runLoss,
-		loadSelectedSceneImage
+		loadSelectedSceneImage,
+		workflowStore
 	} = useAssessmentActions()
 	const themeOptions = THEME_LAYER_OPTIONS
 	const areaOptions = ref([])

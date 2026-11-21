@@ -15,6 +15,7 @@ import santech.common.dbcomponent.entity.annotations.Table;
 
 /**
  * 灾害评估报告归档台账。
+ * 补充 event_id / assessment_id / disaster_type 等主线关联字段；TITLE 即 report_title。
  */
 @Data
 @Table(name = "T_BIZ_REPORT_ARCHIVE")
@@ -27,10 +28,35 @@ public class BizReportArchiveModel implements Serializable {
 	@Column(name = "ID")
 	private String id;
 
+	@Column(name = "EVENT_ID")
+	@ApiModelProperty("关联灾害事件ID")
+	private String eventId;
+
+	@Column(name = "ASSESSMENT_ID")
+	@ApiModelProperty("关联评估记录ID")
+	private String assessmentId;
+
+	@Column(name = "DISASTER_TYPE")
+	@ApiModelProperty("灾种：STORM_SURGE / SEA_WIND / SEA_WAVE")
+	private String disasterType;
+
+	@Column(name = "REPORT_FILE_PATH")
+	@ApiModelProperty("报告文件存储路径")
+	private String reportFilePath;
+
+	@Column(name = "REPORT_FORMAT")
+	@ApiModelProperty("报告格式：DOCX / PDF")
+	private String reportFormat;
+
+	@Column(name = "SUMMARY_JSON")
+	@ApiModelProperty("报告核心结论摘要 JSON")
+	private String summaryJson;
+
 	@Column(name = "REPORT_NO")
 	private String reportNo;
 
 	@Column(name = "TITLE")
+	@ApiModelProperty("报告标题 (report_title)")
 	private String title;
 
 	@Column(name = "TYPE_ID")
