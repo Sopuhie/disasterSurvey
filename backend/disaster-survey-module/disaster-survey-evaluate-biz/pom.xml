@@ -1,0 +1,27 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.santech</groupId>
+        <artifactId>disaster-survey-module</artifactId>
+        <version>${santech.version}</version>
+    </parent>
+
+    <artifactId>disaster-survey-evaluate-biz</artifactId>
+    <packaging>jar</packaging>
+    <name>${project.artifactId}</name>
+    <description>灾后调查及灾情评估业务模块 </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-core</artifactId>
+        </dependency>
+        <!--word报告生成-->
+    	<dependency>
+            <groupId>com.deepoove</groupId>
+            <artifactId>poi-tl</artifactId>
+            <version>1.10.0</version>
+        </dependency>
+    </dependencies>
+</project>

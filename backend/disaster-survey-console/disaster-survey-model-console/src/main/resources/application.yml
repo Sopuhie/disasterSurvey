@@ -1,0 +1,15 @@
+#设置随机端口 10010
+server:
+  port: ${random.int[10110,10150]}
+spring:
+  profiles:
+    active: test
+  application:
+    name: evaluate-model-console
+
+ribbon:
+  ReadTimeout: 30000
+  ConnectTimeout: 30000
+
+logging:
+  config: classpath:log4j2.xml

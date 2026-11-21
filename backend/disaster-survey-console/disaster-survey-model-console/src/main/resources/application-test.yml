@@ -1,0 +1,18 @@
+# 数据库配置
+databse:
+  dbconfig:
+    providers:
+      db1:
+        dbtype: Dm
+        url: jdbc:dm://192.168.5.240:5236?schema="SZCZFX"
+        username: SZCZFX
+        password: ocean@2024
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+      db2:
+        dbtype: Dm
+        url: jdbc:dm://192.168.5.240:5236?schema="SZCZFX"
+        username: SZCZFX
+        password: ocean@2024
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+    debug: true
+    default_db: db1

@@ -1,0 +1,127 @@
+{
+    "displayFieldName": "",
+    "fieldAliases": {
+        "FID": "FID",
+        "label": "label"
+    },
+    "geometryType": "esriGeometryPoint",
+    "spatialReference": {
+        "wkid": 4326,
+        "latestWkid": 4326
+    },
+    "fields": [
+        {
+            "name": "FID",
+            "type": "esriFieldTypeOID",
+            "alias": "FID"
+        },
+        {
+            "name": "label",
+            "type": "esriFieldTypeString",
+            "alias": "label",
+            "length": 254
+        }
+    ],
+    "features": [
+        {
+            "attributes": {
+                "FID": 0,
+                "label": "南平"
+            },
+            "geometry": {
+                "x": 118.089586,
+                "y": 27.387854000000001
+            }
+        },
+        {
+            "attributes": {
+                "FID": 1,
+                "label": "宁德"
+            },
+            "geometry": {
+                "x": 119.554242,
+                "y": 26.6723
+            }
+        },
+        {
+            "attributes": {
+                "FID": 2,
+                "label": "福州"
+            },
+            "geometry": {
+                "x": 119.302903,
+                "y": 26.080552999999998
+            }
+        },
+        {
+            "attributes": {
+                "FID": 3,
+                "label": "莆田"
+            },
+            "geometry": {
+                "x": 119.01218,
+                "y": 25.461765
+            }
+        },
+        {
+            "attributes": {
+                "FID": 4,
+                "label": "泉州"
+            },
+            "geometry": {
+                "x": 118.681814,
+                "y": 24.881381999999999
+            }
+        },
+        {
+            "attributes": {
+                "FID": 5,
+                "label": "厦门"
+            },
+            "geometry": {
+                "x": 118.095642,
+                "y": 24.486042999999999
+            }
+        },
+        {
+            "attributes": {
+                "FID": 6,
+                "label": "漳州"
+            },
+            "geometry": {
+                "x": 117.653876,
+                "y": 24.521014000000001
+            }
+        },
+        {
+            "attributes": {
+                "FID": 7,
+                "label": "龙岩"
+            },
+            "geometry": {
+                "x": 117.023867,
+                "y": 25.082090999999998
+            }
+        },
+        {
+            "attributes": {
+                "FID": 8,
+                "label": "三明"
+            },
+            "geometry": {
+                "x": 117.64530000000001,
+                "y": 26.269200000000001
+            }
+        },
+        {
+            "attributes": {
+                "FID": 8,
+                "label": "平潭"
+            },
+            "geometry": {
+                "x": 119.797439,
+                "y": 25.505288
+            }
+        }
+    ]
+}

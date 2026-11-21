@@ -1,0 +1,25 @@
+// 通用的padding生成混合宏
+@mixin generateSpacing($prop, $prefix, $start, $end) {
+	@for $i from $start through $end {
+		.#{$prefix}#{$i} {
+			#{$prop}: #{$i}px !important;
+		}
+	}
+}
+
+// 使用通用混合宏生成padding类
+@include generateSpacing('padding', 'p-', 0, 100); // 生成 p-* 类
+@include generateSpacing('padding-left', 'pl-', 0, 100); // 生成 pl-* 类
+@include generateSpacing('padding-right', 'pr-', 0, 100); // 生成 pr-* 类
+@include generateSpacing('padding-bottom', 'pb-', 0, 100); // 生成 pb-* 类
+@include generateSpacing('padding-top', 'pt-', 0, 100); // 生成 pt-* 类
+
+// 使用通用混合宏生成padding类
+@include generateSpacing('margin', 'm-', 0, 100); // 生成 p-* 类
+@include generateSpacing('margin-left', 'ml-', 0, 100); // 生成 pl-* 类
+@include generateSpacing('margin-right', 'mr-', 0, 100); // 生成 pr-* 类
+@include generateSpacing('margin-bottom', 'mb-', 0, 100); // 生成 pb-* 类
+@include generateSpacing('margin-top', 'mt-', 0, 100); // 生成 pt-* 类
+
+@include generateSpacing('width', 'w-', 0, 1000);
+@include generateSpacing('height', 'h-', 0, 1000);

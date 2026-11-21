@@ -1,0 +1,28 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.santech</groupId>
+        <artifactId>disaster-survey-module</artifactId>
+        <version>${santech.version}</version>
+    </parent>
+
+    <artifactId>disaster-survey-common-biz</artifactId>
+    <packaging>jar</packaging>
+    <name>${project.artifactId}</name>
+    <description>运维通用接口业务模块 </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-core</artifactId>
+        </dependency>
+       <!--sftp相关依赖  -->
+       <dependency>
+		    <groupId>com.jcraft</groupId>
+		    <artifactId>jsch</artifactId>
+		    <version>0.1.55</version>
+		</dependency>
+        
+    </dependencies>
+</project>

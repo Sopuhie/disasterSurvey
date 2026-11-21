@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8" />
+	<title>乡镇台账同步到服务器</title>
+	<style>
+		body { font-family: system-ui, sans-serif; margin: 24px; max-width: 720px; color: #1f2937; }
+		h1 { font-size: 20px; margin: 0 0 8px; }
+		.meta { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+		button { padding: 10px 18px; font-size: 14px; cursor: pointer; border-radius: 6px; border: 1px solid #059669; background: #10b981; color: #fff; }
+		button:disabled { opacity: 0.5; cursor: not-allowed; }
+		#log { white-space: pre-wrap; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; min-height: 240px; font-size: 12px; line-height: 1.5; margin-top: 16px; }
+		.ok { color: #34d399; }
+		.err { color: #f87171; }
+	</style>
+</head>
+<body>
+	<h1>乡镇行政区 → 后端 batchSave</h1>
+	<div class="meta">使用本页同源 localStorage 登录态，读取 /datas/乡镇.json 后分批写入业务台账。</div>
+	<button id="run">开始同步</button>
+	<div id="log"></div>
+	<script>
+		const BASE = 'http://fzsqi.com:10140/zuul'
+		const API = BASE + '/web-disaster-evaluate/web/disaster/evaluate/bizdata/batchSave'
+		const CHUNK = 20
+		const logEl = document.getElementById('log')
+		const btn = document.getElementById('run')
+
+		function log(msg, cls) {
+			const line = document.createElement('div')
+			if (cls) line.className = cls
+			line.textContent = msg
+			logEl.appendChild(line)
+			logEl.scrollTop = logEl.scrollHeight
+		}
+
+		function headers() {
+			const token = localStorage.getItem('token') || ''
+			let userInfo = null
+			try { userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null') } catch (_) {}
+			if (!token) throw new Error('未找到 token，请先在系统中登录')
+			return {
+				'Content-Type': 'application/json;charset=UTF-8',
+				access_token: token,
+				roles: 'rl0',
+				peopleId: userInfo?.id || '',
+				username: userInfo?.userName || 'system'
+			}
+		}
+
+		async function uploadChunk(list) {
+			const res = await fetch(API, {
+				method: 'POST',
+				headers: headers(),
+				body: JSON.stringify({ dataType: 'town', list })
+			})
+			const text = await res.text()
+			let json
+			try { json = JSON.parse(text) } catch (_) {
+				throw new Error('非 JSON 响应: ' + text.slice(0, 200))
+			}
+			if (json.resultCode && json.resultCode !== 'S') {
+				throw new Error(json.resultMsg || JSON.stringify(json))
+			}
+			return json.data || json
+		}
+
+		btn.onclick = async () => {
+			btn.disabled = true
+			logEl.textContent = ''
+			try {
+				const token = localStorage.getItem('token')
+				log('token: ' + (token ? token.slice(0, 12) + '…' : '无'))
+				const rows = await (await fetch('/datas/乡镇.json')).json()
+				if (!Array.isArray(rows) || !rows.length) throw new Error('乡镇.json 为空')
+				log(`共 ${rows.length} 条，每批 ${CHUNK} 条`)
+				let success = 0
+				let fail = 0
+				for (let i = 0; i < rows.length; i += CHUNK) {
+					const list = rows.slice(i, i + CHUNK).map(item => ({
+						name: item.name,
+						county: item.county,
+						city: item.city,
+						divisionCode: item.divisionCode || item.code || '',
+						population: Number(item.population) || 0,
+						density: Number(item.density) || 0,
+						statArea: Number(item.statArea) || 0,
+						areaKm2: Number(item.areaKm2) || 0,
+						lon: Number(item.lon) || 0,
+						lat: Number(item.lat) || 0,
+						source: item.source || '乡镇.json',
+						fromSystem: true,
+						geojson: item.geojson || ''
+					}))
+					const batchNo = Math.floor(i / CHUNK) + 1
+					const totalBatches = Math.ceil(rows.length / CHUNK)
+					try {
+						const data = await uploadChunk(list)
+						const ok = Number(data?.success ?? list.length)
+						const bad = Number(data?.fail ?? 0)
+						success += ok
+						fail += bad
+						log(`[${batchNo}/${totalBatches}] ok=${ok} fail=${bad}`, bad ? 'err' : 'ok')
+					} catch (e) {
+						fail += list.length
+						log(`[${batchNo}/${totalBatches}] 失败: ${e.message || e}`, 'err')
+					}
+				}
+				log(`完成：成功 ${success}，失败 ${fail}`, fail ? 'err' : 'ok')
+			} catch (e) {
+				log('中止: ' + (e.message || e), 'err')
+			} finally {
+				btn.disabled = false
+			}
+		}
+
+		// 自动开始
+		btn.click()
+	</script>
+</body>
+</html>

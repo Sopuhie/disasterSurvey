@@ -1,0 +1,4 @@
+启动脚本：nohup java -Xms512m -Xmx1024m  -jar  disaster-survey-admin.jar >  log/temp.log 2>&1&
+关闭脚本：
+查询服务进程号：lsof -i:PORT,如lsof -i:10101
+结束进程：kill -9 PID

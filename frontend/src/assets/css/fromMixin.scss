@@ -1,0 +1,51 @@
+:root {
+	// --sidebar-bg-item-cur: linear-gradient(to right, rgba(26, 83, 152, 1), rgba(12, 49, 100, 0.36));
+	--el-color-primary: #1890ff;
+}
+
+.asterisk:before {
+	content: '*';
+	color: #f56c6c;
+	margin-right: 4px;
+}
+
+.formItem {
+	position: relative;
+	&.item {
+		margin-top: 24px;
+	}
+	&.yItem {
+		margin-top: 24px;
+	}
+	&:first-child {
+		margin-top: 0;
+	}
+	&.formChild {
+		margin-top: 0;
+	}
+	& .errInfo {
+		position: absolute;
+		bottom: -24px;
+		left: 128px;
+		font-size: 12px;
+		color: #f56c6c;
+	}
+}
+.formLabel {
+	display: inline-block;
+	width: 100px;
+	height: 30px;
+	line-height: 30px;
+	overflow: hidden;
+	text-align: right;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--el-text-color-regular);
+}
+.formChild {
+	width: 50%;
+}
+.formWidget {
+	width: calc(100% - 112px);
+	margin-left: 12px;
+}

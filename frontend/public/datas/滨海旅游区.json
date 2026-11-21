@@ -1,0 +1,630 @@
+{
+	"displayFieldName": "",
+	"fieldAliases": {
+		"FID": "FID",
+		"division": "division",
+		"dangerName": "dangerName",
+		"longitude": "longitude",
+		"latitude": "latitude",
+		"面积": "面积",
+		"Management": "Management"
+	},
+	"geometryType": "esriGeometryPoint",
+	"spatialReference": {
+		"wkid": 4490,
+		"latestWkid": 4490
+	},
+	"fields": [
+		{
+			"name": "FID",
+			"type": "esriFieldTypeOID",
+			"alias": "FID"
+		},
+		{
+			"name": "division",
+			"type": "esriFieldTypeString",
+			"alias": "division",
+			"length": 50
+		},
+		{
+			"name": "dangerName",
+			"type": "esriFieldTypeString",
+			"alias": "dangerName",
+			"length": 50
+		},
+		{
+			"name": "longitude",
+			"type": "esriFieldTypeDouble",
+			"alias": "longitude"
+		},
+		{
+			"name": "latitude",
+			"type": "esriFieldTypeDouble",
+			"alias": "latitude"
+		},
+		{
+			"name": "面积",
+			"type": "esriFieldTypeString",
+			"alias": "面积",
+			"length": 50
+		},
+		{
+			"name": "Management",
+			"type": "esriFieldTypeString",
+			"alias": "Management",
+			"length": 50
+		}
+	],
+	"features": [
+		{
+			"attributes": {
+				"FID": 0,
+				"division": "福建省-漳州市-漳浦县",
+				"dangerName": "翡翠湾滨海旅游区",
+				"longitude": 117.773151,
+				"latitude": 23.952064,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 117.77315092137803,
+				"y": 23.95206381269486
+			}
+		},
+		{
+			"attributes": {
+				"FID": 1,
+				"division": "福建省-漳州市-漳浦县",
+				"dangerName": "龙美湾滨海旅游区",
+				"longitude": 117.796255,
+				"latitude": 23.968789999999998,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 117.79625452722473,
+				"y": 23.968790006653535
+			}
+		},
+		{
+			"attributes": {
+				"FID": 2,
+				"division": "福建省-漳州市-漳浦县",
+				"dangerName": "火山岛地质公园滨海旅游区",
+				"longitude": 118.02412699999999,
+				"latitude": 24.211134000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.0241272869448,
+				"y": 24.211133520895316
+			}
+		},
+		{
+			"attributes": {
+				"FID": 3,
+				"division": "福建省-漳州市-东山县",
+				"dangerName": "马銮湾",
+				"longitude": 117.49498699999999,
+				"latitude": 23.726337000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 117.49498699999999,
+				"y": 23.726337000000001
+			}
+		},
+		{
+			"attributes": {
+				"FID": 4,
+				"division": "福建省-漳州市-龙海市",
+				"dangerName": "白塘湾旅游区",
+				"longitude": 118.04359700000001,
+				"latitude": 24.231769,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.04359735408279,
+				"y": 24.231768512346822
+			}
+		},
+		{
+			"attributes": {
+				"FID": 5,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "龟山湾",
+				"longitude": 118.845798,
+				"latitude": 24.882370000000002,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.845798,
+				"y": 24.882370000000002
+			}
+		},
+		{
+			"attributes": {
+				"FID": 6,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "月亮湾",
+				"longitude": 118.830355,
+				"latitude": 24.878572999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.830355,
+				"y": 24.878572999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 7,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "白沙湾",
+				"longitude": 118.79284699999999,
+				"latitude": 24.869109999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.79284699999999,
+				"y": 24.869109999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 8,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "白鹤湾",
+				"longitude": 118.763696,
+				"latitude": 24.858962999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.763696,
+				"y": 24.858962999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 9,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "惠女湾",
+				"longitude": 118.980051,
+				"latitude": 24.989892000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.980051,
+				"y": 24.989892000000001
+			}
+		},
+		{
+			"attributes": {
+				"FID": 10,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "西沙湾",
+				"longitude": 118.917987,
+				"latitude": 24.882978999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.917987,
+				"y": 24.882978999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 11,
+				"division": "福建省-泉州市-惠安县",
+				"dangerName": "青山湾",
+				"longitude": 118.879953,
+				"latitude": 24.895049,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.879953,
+				"y": 24.895049
+			}
+		},
+		{
+			"attributes": {
+				"FID": 12,
+				"division": "福建省-泉州市-晋江市",
+				"dangerName": "金沙湾",
+				"longitude": 118.573999,
+				"latitude": 24.520386999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.573999,
+				"y": 24.520386999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 13,
+				"division": "福建省-泉州市-晋江市",
+				"dangerName": "月亮湾",
+				"longitude": 118.571027,
+				"latitude": 24.514324999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.571027,
+				"y": 24.514324999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 14,
+				"division": "福建省-泉州市-石狮市",
+				"dangerName": "红塔湾",
+				"longitude": 118.717358,
+				"latitude": 24.691296999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.717358,
+				"y": 24.691296999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 15,
+				"division": "福建省-泉州市-石狮市",
+				"dangerName": "中骏黄金海岸",
+				"longitude": 118.703582,
+				"latitude": 24.677220999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.703582,
+				"y": 24.677220999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 16,
+				"division": "福建省-厦门市-思明区",
+				"dangerName": "鼓浪屿",
+				"longitude": 118.06209699999999,
+				"latitude": 24.44868,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.06663055359159,
+				"y": 24.441920883736159
+			}
+		},
+		{
+			"attributes": {
+				"FID": 17,
+				"division": "福建省-厦门市-思明区",
+				"dangerName": "白城",
+				"longitude": 118.10007899999999,
+				"latitude": 24.433661000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.10007899999999,
+				"y": 24.433661000000001
+			}
+		},
+		{
+			"attributes": {
+				"FID": 18,
+				"division": "福建省-厦门市-思明区",
+				"dangerName": "珍珠湾",
+				"longitude": 118.109739,
+				"latitude": 24.430758000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.109739,
+				"y": 24.430758000000001
+			}
+		},
+		{
+			"attributes": {
+				"FID": 19,
+				"division": "福建省-厦门市-思明区",
+				"dangerName": "椰风寨",
+				"longitude": 118.16318200000001,
+				"latitude": 24.449555,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.16318200000001,
+				"y": 24.449555
+			}
+		},
+		{
+			"attributes": {
+				"FID": 20,
+				"division": "福建省-厦门市-思明区",
+				"dangerName": "观音山",
+				"longitude": 118.19375100000001,
+				"latitude": 24.49287,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 118.19375100000001,
+				"y": 24.49287
+			}
+		},
+		{
+			"attributes": {
+				"FID": 21,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "莲池澳沙滩",
+				"longitude": 119.130056,
+				"latitude": 25.071335999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.130056,
+				"y": 25.071335999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 22,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "北埭澳沙滩",
+				"longitude": 119.132384,
+				"latitude": 25.062645,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.132384,
+				"y": 25.062645
+			}
+		},
+		{
+			"attributes": {
+				"FID": 23,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "英兜、东湖头沙滩",
+				"longitude": 119.124101,
+				"latitude": 25.04063,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.124101,
+				"y": 25.04063
+			}
+		},
+		{
+			"attributes": {
+				"FID": 24,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "鹅尾沙滩",
+				"longitude": 119.1191,
+				"latitude": 25.033232000000002,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.1191,
+				"y": 25.033232000000002
+			}
+		},
+		{
+			"attributes": {
+				"FID": 25,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "三湾滩",
+				"longitude": 119.110626,
+				"latitude": 25.038034,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.110626,
+				"y": 25.038034
+			}
+		},
+		{
+			"attributes": {
+				"FID": 26,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "黄金沙滩",
+				"longitude": 119.09881300000001,
+				"latitude": 25.0488,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.09881300000001,
+				"y": 25.0488
+			}
+		},
+		{
+			"attributes": {
+				"FID": 27,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "湄屿潮音",
+				"longitude": 119.151025,
+				"latitude": 25.097563000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.151025,
+				"y": 25.097563000000001
+			}
+		},
+		{
+			"attributes": {
+				"FID": 28,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "牛头尾沙滩",
+				"longitude": 119.147313,
+				"latitude": 25.094601999999998,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.147313,
+				"y": 25.094601999999998
+			}
+		},
+		{
+			"attributes": {
+				"FID": 29,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "日纹坑沙滩",
+				"longitude": 119.129958,
+				"latitude": 25.050898,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.129958,
+				"y": 25.050898
+			}
+		},
+		{
+			"attributes": {
+				"FID": 30,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "东户",
+				"longitude": 119.518495,
+				"latitude": 25.170766,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.518495,
+				"y": 25.170766
+			}
+		},
+		{
+			"attributes": {
+				"FID": 31,
+				"division": "福建省-莆田市-秀屿区",
+				"dangerName": "燕里",
+				"longitude": 119.537699,
+				"latitude": 25.188929999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.537699,
+				"y": 25.188929999999999
+			}
+		},
+		{
+			"attributes": {
+				"FID": 32,
+				"division": "福建省-宁德市-霞浦县",
+				"dangerName": "滨海旅游区-大京海滩",
+				"longitude": 120.105777965,
+				"latitude": 26.699945943900001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 120.10577796538087,
+				"y": 26.699945944249976
+			}
+		},
+		{
+			"attributes": {
+				"FID": 33,
+				"division": "福建省-宁德市-福鼎市",
+				"dangerName": "太姥山镇牛郎岗海滨景区",
+				"longitude": 120.279611374,
+				"latitude": 27.056215885,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 120.27961137400007,
+				"y": 27.056215885000029
+			}
+		},
+		{
+			"attributes": {
+				"FID": 34,
+				"division": "福建省-福州市-平潭",
+				"dangerName": "龙王头海洋公园",
+				"longitude": 119.805441,
+				"latitude": 25.506074999999999,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.80544090052379,
+				"y": 25.506075095083453
+			}
+		},
+		{
+			"attributes": {
+				"FID": 35,
+				"division": "福建省-福州市-平潭",
+				"dangerName": "坛南湾景区",
+				"longitude": 119.75848499999999,
+				"latitude": 25.437411000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.75848526644353,
+				"y": 25.437411215903186
+			}
+		},
+		{
+			"attributes": {
+				"FID": 36,
+				"division": "福建省-福州市-马尾区",
+				"dangerName": "龙鼓度假村",
+				"longitude": 119.637907,
+				"latitude": 26.063835000000001,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.63790695150848,
+				"y": 26.06383494435925
+			}
+		},
+		{
+			"attributes": {
+				"FID": 37,
+				"division": "福建省-福州市-长乐区",
+				"dangerName": "下沙海滨度假村海滩",
+				"longitude": 119.61168499999999,
+				"latitude": 25.817340000000002,
+				"面积": "",
+				"Management": ""
+			},
+			"geometry": {
+				"x": 119.61168535068187,
+				"y": 25.81733988324174
+			}
+		}
+	]
+}

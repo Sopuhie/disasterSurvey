@@ -1,0 +1,153 @@
+--- #################### 数据库相关配置 （自定义的数据库操作组件）####################
+databse:
+  dbconfig:
+    providers:
+      db1:
+        dbtype: Dm
+        url: jdbc:dm://192.168.5.11:5236?schema="DB_DISASTER"&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=Asia/Shanghai&useSSL=true&characterEncoding=UTF-8
+        username: DB_DISASTER
+        password: ocean@2024
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+      db2:
+        dbtype: Dm
+        url: jdbc:dm://192.168.5.11:5236?schema="DB_DANGER"
+        username: DB_DANGER
+        password: ocean@2024
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+    debug: true
+    default_db: db1
+
+--- #################### Redis 配置 ####################
+spring.redis:
+  database: 4 # 数据库索引
+  host: localhost # 地址
+  port: 6379 # 端口
+  password: santech@redis2024
+  timeout: 1000
+  lettuce:
+    pool:
+      max-active: 16
+      max-wait: -1
+      max-idle: 8
+      min-idle: 4
+
+
+--- #################### authentication业务相关配置 ####################
+single.login.enable: false #是否控制用户只能在一处登录，设置为true时，若某用户已登录，再用同一用户在其他客户端登录将把之前已登录的顶掉
+authentication:
+  user:
+    defaultPassword: aaaa_0000
+  #本地登录密码解密私钥
+  rasPrivateKey: MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAMQLS8D2yYka3AHyZjmZ4USeaSp+qSEGfU8odXYVwDwYKdqORX9HsuPqWetXCCLIqIVP8kFVRqADL2yFgHTh9RMD6geWA6P3opd//O2TDgD3GBNv7gVajQzb7OdgQ3wn/n9wmow+2UHp+Mlo0nVecshgIk/Cu7TctU3hnsiOWm/jAgMBAAECgYAINhTpMy0D0h0u87E2bmySDDSJdB6vZG8xNpec55JSsgxmvBjLGPy0MSetBMsxccglNVEHTYQUxa1h1UGpI6G5JEk8ZKKF5btWL6i5q/fpp1ZBazRdLcW0YPOSWC5H2EcoHbwDd0iLwnuqkc9+aouRl4YWfaDRQ2Qz2pK3h1d/IQJBAPqjn6cw0Y/XpNbb1TqGbRHbrgZErkWacwL1fvpqe1Q6iC7Gt7eOFH5xUkxUzaDSPvZLbzEPIjMl1mqAZI1TzpECQQDIPLygHpfQaMCUhueZYmbrreq7eJ9YkodSHc2zqXAgzGpxqHIEipcsuaJu1XxHGC1bUhKtKD8U3BqZSsXsCjkzAkBUt8nXMWEkRbeqCFRim91yE9cWt1BQpowJjAGHk0ZsifxOE0019ghnVNaEhoWavnYZuhWzd3IP59I53XwfaRyBAkEArycp3GpGZABtjL6g8jP4UWo1bT2rLUAnbLYzTFgHhDkrVzaAXeaZLH9JTegiqNHGQx58xcjxvR53ieW1Ua7zrwJAV456oCFWCV5OMgGlk8mvvMq773DluVgyJPLTEewMJjHy5D1FyFs3wzwdNuiK0hJmJ5dPsFcgu7qax89OjTY6lQ==
+
+#单点登录配置-二级单点（默认单点方式）
+sso: 
+  enable: false
+  # sso服务端项目地址
+  baseUrl: http://192.168.15.191:8085
+  # sso客户端项目对应的应用编码(在sso服务端申请应用后分配)
+  clientId: 256e38f7ee254924a4a17ea840539ee1
+  # sso客户端项目对应的应用秘钥(在sso服务端申请应用后分配)
+  clientSecret: 91fa1abe2f0146c6a6abbfac2679b1d5c667a9ece32b44a6b6e22518962ab5bc
+  # sso显性登录授权码验证接口 (POST方式获取token)
+  tokenUrl: ${sso.baseUrl}/sso/oauth/token
+  # sso根据token获取当前用户信息 (Get方式)
+  curUserUrl: ${sso.baseUrl}/sso/user/current?access_token=
+  # sso根据校验token有效性 (Get方式)
+  checkTokenUrl: ${sso.baseUrl}/sso/oauth/check_token?token=
+#一级单点登录（福建省数字身份管理服务平台），当二级单点失败时转向一级单点，通过前端进行切换实现
+yjsso:
+  # 是否启用一级单点登录
+  enabled: false
+  # 基础地址
+  baseUrl: https://allinone-public.e-govt.cn:9080
+  # 前端地址（登录成功后跳转）
+  frontUrl: http://your-domain/yjsso-ui/#/yjSsoLogin?st="
+  # === 闽政务OAuth配置 ===
+  clientId: fht
+  clientSecret: 3c9245bd21e5483bb03ae7026a27a66c
+  tokenUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/getTokenV2
+  userInfoUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/getUserInfoV2
+  refreshTokenUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/refreshTokenV2
+  tokenInfoUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/getTokenInfoV2
+  checkTokenValidUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/checkTokenValidV2
+  revokeTokenUrl: ${yjsso.baseUrl}/ebus/ability_sszsfpt_zw/idp/oauth2/revokeTokenV2
+  globalLogoutUrl: ${yjsso.baseUrl}/idp/authCenter/GLO
+  # 登录 + 同步共用配置
+  sm4key: kda1wrq3o9vvx50l
+  ythPassid: app_fjshyyyysjzxxm
+  ythToken: TO0C1954gASeK2rpo70LnxUaeDej0QmI
+  # IAM数据同步配置
+  iam:
+    queryAppId: fc49f271-6e75-4388-b8c5-d478a807e2c2
+    queryBaseUrl: ${yjsso.baseUrl}
+    queryOrgUrl: ${yjsso.iam.queryBaseUrl}/ebus/ability_sszsfpt_zw/bimweb/data/sync/QueryOrgByFullV2
+    queryUserUrl: ${yjsso.iam.queryBaseUrl}/ebus/ability_sszsfpt_zw/bimweb/data/sync/QueryUserByFullV2
+    bimRemoteUser: bim_sm4_pusher
+    bimRemotePwd: BimSm4$Push#2026!Yj
+# 是否跳过签名（生产环境必须 false）
+  skipSign: false        
+hsfjsso:
+  # 海上福建sso服务对应配置
+  enable: false
+  url: http://58.22.6.34:18099/authentication-center-api/
+  tokenUrl: ${hsfjsso.url}/oauth2/token
+  refreshTokenUrl: ${hsfjsso.url}/oauth2/refresh
+  checkAccessTokenUrl: ${hsfjsso.url}/oauth2/checkAccessToken
+  checkHasLoginUrl: ${hsfjsso.url}/oauth2/checkHasLogin
+  userinfoUrl: ${hsfjsso.url}/oauth2/userinfo
+  logoutUrl: ${hsfjsso.url}/oauth2/logout
+  clientId: 0dm6rbg2758j5jcv
+  clientSecret: GetEU5I115ag26r52BFxyGcqzEiJg27B
+
+--- #################### 加密系统相关配置 ####################
+kind:
+  crypto:
+    enable: false
+    #正式环境为 hyzbqm_xc
+    appname: web
+
+
+--- #################### common业务相关配置 ####################
+#文件目录配置
+file:
+   # 文件仓库根路径 
+  rootForLiunx: /data/program/disaster_program/files/
+  rootForWin: D:\project\files\ 
+  localCachePathWin: D:\project\files\downloadcache\
+  localCachePathLin: /data/program/disaster_program/files/downloadcache/
+  #日志文件存放绝对路径,多个以英文逗号分割
+  logpath: /data/program/disaster_program/log
+  modelJarPath: console/disaster-survey-model-console-1.0.1.jar
+  encode: GBK 
+
+--- #################### gis业务相关配置 ####################
+service:
+   #D:\project\files
+  rootPath: ${file.rootForLiunx}overlay          
+  encode: GBK
+
+--- #################### resource业务相关配置 ####################
+#符号存储根路径
+map.symbol.file.rootpath: ${file.rootForLiunx}
+
+#数据服务代理配置
+service:
+  proxy:
+    forwarding:
+      url: http://192.168.5.11:10401/zuul/web-updc-resource/web/updc/resource/service/proxy/forwarding
+      enable: disable #disable #enable
+
+
+--- #################### 反馈窗口相关配置 ####################
+feedback:
+  open:
+    secret: Fkxt@Open#2026!Hmac
+    sys-code: hsfj-fjhyzhzzhfc
+    sys-name: 福建省海洋灾害综合防治
+    # 反馈平台后端开放接口地址（iframe 内开放接口由它派生；平台换后端域名只改这一行；宿主为 https 时此处必须 https）
+    server-url: http://localhost:8082
+    # 反馈平台前端部署上的嵌入件目录（挂件js/feedback.html 所在目录，含尾斜杠；与 server-url 解耦，与 aigent 接入同构）
+    front-url: http://localhost:3001/static/feedback/
+
+

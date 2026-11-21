@@ -1,0 +1,96 @@
+/**
+ * 项目地址
+ */
+export const baseURL = 'http://fzsqi.com:10401/zuul/'
+export const authURL = 'http://fzsqi.com:10401/zuul/'
+export const tiandituVecTileUrl = `http://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819`
+export const tiandituCiaTileUrl = `http://t0.tianditu.gov.cn/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819`
+
+// 局里正式部署
+// export const baseURL = 'https://172.26.202.105:443/disaster/zuul/'
+// export const authURL = 'https://172.26.202.105:443/disaster/zuul/'
+// export const tiandituVecTileUrl = `https://172.26.202.105:443/disaster/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819`
+// export const tiandituCiaTileUrl = `https://172.26.202.105:443/disaster/DataServer?T=cia_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819`
+
+/**
+ * 系统初始化配置
+ */
+export const systemName = 'DisasterSurveySystem' //
+/**
+ * 系统初始化地方坐标系配置
+ */
+export const localCoordSysName = 'GzucpdDataPlatform'
+/**
+ * 系统名称
+ */
+export const appTitle = 'SAN·TECH'
+export const appTitleEn = '灾后调查与评估'
+
+/**
+ * 信创单点配置
+ */
+export const base = 'https://172.26.202.105:443/sso'
+export const app_id = '1962342749571313665'
+export const client_id = 'b24e73e8311b4b368f3271c9f8b9da2d'
+export const client_secret = '6b21832f60614e2c9363aac413be9440beea558d9c6245649290050986472821'
+/**
+ * 一级单点配置
+ */
+export const one_base = 'https://allinone-public.e-govt.cn:9080'
+export const one_app_id = '1962342749571313665'
+export const one_client_id = 'fht'
+export const one_client_secret = '3c9245bd21e5483bb03ae7026a27a66c'
+
+// 是否开启单点登录
+export const isSingleLogin = true
+// 是不是政务中台
+export const isZwzt = true
+// 系统前缀（局里正式部署值为：'disaster'，测试环境为：''）
+export const prefix = 'disaster'
+
+/**
+ * 反馈系统嵌入配置（宿主前端）
+ * 正式接入：平台 frontUrl 可达 + useLocalWidget=false；有宿主后端后改 useLocalSign=false。
+ * 平台不可达联调：useLocalWidget=true，走本站 public/static/feedback 挂件。
+ */
+export const feedbackOpen = {
+	/** 总开关：false 时不初始化反馈挂件、不显示入口按钮 */
+	enabled: true,
+	/**
+	 * 签名来源
+	 * true  — 前端本地 HMAC 签发（当前无宿主后端时用；密钥留在前端，勿用于生产）
+	 * false — 请求下方 signApi，由宿主后端签发（手册正式方式）
+	 */
+	useLocalSign: false,
+	/**
+	 * 挂件脚本来源
+	 * true  — 用 localFrontUrl（本站 /static/feedback），平台不可达时保证按钮可见
+	 * false — 用 frontUrl 加载平台托管的 feedback-widget.js（正式接入）
+	 */
+	useLocalWidget: false,
+	/** 验签密钥：须与反馈平台 feedback.open.secret 逐字符一致；仅 useLocalSign=true 时前端使用 */
+	secret: 'Fkxt@Open#2026!Hmac',
+	/** 业务系统标识：须已在反馈平台字典 tb_b_fk_gd_ywxt 登记；表中无则向平台管理员申请 */
+	sysCode: 'hsfj-fjhyzhzzhfc',
+	/** 业务系统显示名：反馈窗口「业务系统」只读展示用 */
+	sysName: '福建省海洋灾害综合防治',
+	/** 反馈平台后端开放接口地址（不带尾斜杠）；iframe 内 openapi / 附件由此派生为 apiBase */
+	serverUrl: 'https://59.204.230.26:10030/fankui-ui/api',
+	/**
+	 * 反馈平台前端嵌入件目录（含尾斜杠）；useLocalWidget=false 时生效
+	 * 派生：frontUrl + feedback-widget.js、iframe 的 feedback.html
+	 * 须与当前页面同协议（宿主 https 则此处也须 https），否则混合内容被拦
+	 */
+	frontUrl: 'https://59.204.230.26:10030/fankui-ui/static/feedback/',
+	/** 本地挂件目录（含尾斜杠）；useLocalWidget=true 时覆盖 frontUrl，相对当前站点 */
+	localFrontUrl: '/static/feedback/',
+	/**
+	 * 宿主后端签名接口路径；useLocalSign=false 时 GET 此地址
+	 * 响应需含：sysCode/sysName/frontUrl/baseUrl/apiBase/user/sign/timestamp
+	 */
+	signApi: '/web-disaster-authentication/web/disaster/authentication/feedback/open/sign'
+}
+
+
+测试："env": "test"（当前默认）
+部署：改成 "env": "prod" 即可，不用重新打包

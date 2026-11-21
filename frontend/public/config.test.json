@@ -1,0 +1,42 @@
+{
+	"baseURL": "http://fzsqi.com:10140/zuul/",
+	"authURL": "http://fzsqi.com:10140/zuul/",
+	"tiandituVecTileUrl": "http://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819",
+	"tiandituCiaTileUrl": "http://t0.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=2cecf0a480444e856bbdd713f4574819",
+	"systemName": "DisasterSurveySystem",
+	"localCoordSysName": "GzucpdDataPlatform",
+	"appTitle": "SAN·TECH",
+	"appTitleEn": "灾后调查与评估",
+	
+	"base": "https://172.26.202.105:443/sso",
+	"app_id": "1962342749571313665",
+	"client_id": "b24e73e8311b4b368f3271c9f8b9da2d",
+	"client_secret": "6b21832f60614e2c9363aac413be9440beea558d9c6245649290050986472821",
+	
+    "one_base": "https://iam.fj.cegn.cn:4431",
+	"one_app_id": "1962342749571313665",
+	"one_client_id": "fht",
+	"one_client_secret": "3c9245bd21e5483bb03ae7026a27a66c",
+	"one_system_code": "disaster",
+	"one_redirect_uri": "http://fzsqi.com:10140/zuul/web-disaster-authentication/web/disaster/authentication/user/verify/yjsso/ssoCode",
+	
+	"isSingleLogin": false,
+	"isZwzt": false,
+
+	"enableMockTools": false,
+
+	"prefix": "",
+
+	"feedbackOpen": {
+		"enabled": true,
+		"useLocalSign": true,
+		"useLocalWidget": true,
+		"secret": "Fkxt@Open#2026!Hmac",
+		"sysCode": "hsfj-fjhyzhzzhfc",
+		"sysName": "福建省海洋灾害综合防治",
+		"serverUrl": "https://59.204.230.26:10030/fankui-ui/api",
+		"frontUrl": "https://59.204.230.26:10030/fankui-ui/static/feedback/",
+		"localFrontUrl": "/static/feedback/",
+		"signApi": "/web-disaster-authentication/web/disaster/authentication/feedback/open/sign"
+	}
+}

@@ -1,0 +1,24 @@
+# 配置注册中心
+santech:
+  dm:
+    host: (10.221.11.116:5236,10.221.11.117:5236)
+    username: SZCZFX
+    password: ocean@2024
+#互联网
+databse:
+  dbconfig:
+    providers:
+      db1:
+        dbtype: Dm
+        url: jdbc:dm://DMDB?DMDB=${santech.dm.host}&loginMode=(1)&rwSeparate=(1)&rwPercent=(25)
+        username: ${santech.dm.username}
+        password: ${santech.dm.password}
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+      db2:
+        dbtype: Dm
+        url: jdbc:dm://DMDB?DMDB=${santech.dm.host}&loginMode=(1)&rwSeparate=(1)&rwPercent=(25)
+        username: ${santech.dm.username}
+        password: ${santech.dm.password}
+        datasource_type: com.alibaba.druid.pool.DruidDataSource
+    debug: true
+    default_db: db1

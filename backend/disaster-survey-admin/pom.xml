@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.santech</groupId>
+        <artifactId>disaster-survey</artifactId>
+        <version>${santech.version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>disaster-survey-admin</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+    <description> 单体服务启动器 </description>
+
+    <dependencies>
+
+        <!-- 代码生成器、接口文档 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 单体业务服务 -->
+        <dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-authentication-biz</artifactId>
+            <exclusions>
+            	<exclusion>
+            		<groupId>org.springframework.boot</groupId>
+            		<artifactId>spring-boot-starter-logging</artifactId>
+            	</exclusion>
+            </exclusions>
+        </dependency>
+		<dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-common-biz</artifactId>
+        </dependency>
+		<dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-system-biz</artifactId>
+        </dependency>
+		<dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-resource-biz</artifactId>
+        </dependency>
+		<dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-gis-biz</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.santech</groupId>
+            <artifactId>disaster-survey-evaluate-biz</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- 设置构建的 jar 包名 -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- 打包 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal> <!-- 将引入的 jar 打入其中 -->
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
